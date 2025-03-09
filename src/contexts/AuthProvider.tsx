@@ -8,10 +8,9 @@ import {
 import { AuthContext } from './AuthContext';
 import { CognitoUserAttributes } from './AuthTypes';
 
-// Cognito configuration from environment variables
 const poolData = {
-  UserPoolId: 'us-east-1_uJiLlyoFF' || 'dummy-user-pool-id',
-  ClientId: '3uff7cmoji5rifqrb7vcvc7eoi' || 'dummy-client-id'
+  UserPoolId: 'us-east-1_uJiLlyoFF',
+  ClientId: '3uff7cmoji5rifqrb7vcvc7eoi'
 };
 
 const userPool = new CognitoUserPool(poolData);
