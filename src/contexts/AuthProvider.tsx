@@ -9,8 +9,8 @@ import { AuthContext } from './AuthContext';
 import { CognitoUserAttributes } from './AuthTypes';
 
 export const cognitoConfig = {
-  UserPoolId: `us-east-1_uJiLlyoFF`,
-  ClientId: `3uff7cmoji5rifqrb7vcvc7eoi`
+  UserPoolId: `${import.meta.env.VITE_COGNITO_USER_POOL_ID}`
+  ClientId: `${import.meta.env.VITE_COGNITO_CLIENT_ID}`
 };
 
 const userPool = new CognitoUserPool({

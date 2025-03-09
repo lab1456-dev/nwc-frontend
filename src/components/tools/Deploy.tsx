@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import WorkflowStepDescriptions from './WorkflowStepDescriptions';
 
 const Deploy = () => {
-  const API_URL = `${import.meta.env.VITE_SOME_BASE_URL}/deploy`; // Update the .env file with the actual API endpoint
+  const API_URL = `${import.meta.env.VITE_API_URL}/deploy`; // Update the .env file with the actual API endpoint
 
   const [deviceId, setDeviceId] = useState('');
   const [siteId, setSiteId] = useState('');

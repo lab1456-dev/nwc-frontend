@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import WorkflowStepDescriptions from './WorkflowStepDescriptions';
 
 const Replace = () => {
-  const API_URL = `${import.meta.env.VITE_SOME_BASE_URL}`; // Base URL for all API endpoints
+  const API_URL = `${import.meta.env.VITE_API_URL}`; // Base URL for all API endpoints
   const REPLACE_ENDPOINT = `${API_URL}/replace`;
   const CROW_ASSOCIATION_ENDPOINT = `${API_URL}/crow-association`;
   const NON_DEPLOYED_CROWS_ENDPOINT = `${API_URL}/non-deployed-crows-at-site`;

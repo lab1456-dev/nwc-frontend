@@ -3,7 +3,7 @@ import WorkflowStepDescriptions from './WorkflowStepDescriptions';
 
 const Provision = () => {
   // Define API key as a constant in the component
-  const API_URL = `${import.meta.env.VITE_API_URL}/provision`; // Update the .env file with the actual API endpoint
+  const API_URL = `${import.meta.env.VITE_API_URL}/provision`; //   Update the .env file with the actual API endpoint
   const API_KEY = `${import.meta.env.VITE_PROVISION_API_KEY}`; // Update the .env file with the actual API key
 
   const [deviceId, setDeviceId] = useState('');

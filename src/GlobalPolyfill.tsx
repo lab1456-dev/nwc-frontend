@@ -1,8 +1,3 @@
-console.log('AWS Config:', {
-  userPoolId: import.meta.env.VITE_USER_POOL_ID,
-  region: import.meta.env.VITE_REGION
-});
-
 // This file provides polyfills for Node.js globals needed by the amazon-cognito-identity-js library
 
 // Add global to window for amazon-cognito-identity-js
