@@ -12,7 +12,7 @@ const SignInPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   
   // Keep this variable to easily re-enable sign-up later
-  const isSignUp = false;
+  // const isSignUp = true;
   
   const { signIn, isAuthenticated } = useContext(AuthContext);
   const navigate = useNavigate();

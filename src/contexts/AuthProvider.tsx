@@ -15,8 +15,8 @@ const poolData = {
 };
 
 // Environment-specific settings
-const mfaRequired = import.meta.env.VITE_COGNITO_REQUIRES_MFA === 'true';
-const redirectUri = import.meta.env.VITE_COGNITO_REDIRECT_URI || window.location.origin;
+// const mfaRequired = import.meta.env.VITE_COGNITO_REQUIRES_MFA === 'true';
+// const redirectUri = import.meta.env.VITE_COGNITO_REDIRECT_URI || window.location.origin;
 
 // Log info about missing configuration in development mode
 if (import.meta.env.DEV && 
@@ -35,9 +35,7 @@ interface AuthProviderProps {
   children: React.ReactNode;
 }
 
-// Global variables to store authentication state during MFA flow
-let pendingUsername = '';
-let pendingPassword = '';
+// Global variable to store the Cognito user during MFA flow
 let cognitoUser: CognitoUser | null = null;
 
 const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
@@ -116,8 +114,6 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           onSuccess: (session) => {
             setIsAuthenticated(true);
             setMfaPending(false);
-            pendingUsername = '';
-            pendingPassword = '';
             
             // Get user attributes
             cognitoUser!.getUserAttributes((err, attributes) => {
@@ -144,10 +140,6 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         });
         return;
       }
-
-      // Store credentials for potential MFA flow
-      pendingUsername = username;
-      pendingPassword = password;
 
       const authenticationDetails = new AuthenticationDetails({
         Username: username,
@@ -191,7 +183,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setMfaPending(false);
           reject(err);
         },
-        mfaRequired: (challengeName, challengeParameters) => {
+        mfaRequired: (challengeName) => {
           console.log("MFA required:", challengeName);
           // Handle MFA challenge
           setMfaPending(true);
@@ -201,7 +193,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           mfaError.name = 'MFARequiredError';
           reject(mfaError);
         },
-        totpRequired: (challengeName, challengeParameters) => {
+        totpRequired: (challengeName) => {
           console.log("TOTP required:", challengeName);
           // Handle TOTP (Time-based One-Time Password) challenge
           setMfaPending(true);
