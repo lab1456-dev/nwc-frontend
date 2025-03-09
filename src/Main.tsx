@@ -7,6 +7,11 @@ import App from "./App";
 import 'virtual:windi.css'; // Import Windi CSS
 import "./index.css"; // Import custom styles
 
+console.log('AWS Config:', {
+  userPoolId: import.meta.env.VITE_USER_POOL_ID,
+  region: import.meta.env.VITE_REGION
+});
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>
