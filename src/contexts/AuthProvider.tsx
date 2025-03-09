@@ -10,24 +10,9 @@ import { CognitoUserAttributes } from './AuthTypes';
 
 // Cognito configuration from environment variables
 const poolData = {
-  UserPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID || 'dummy-user-pool-id',
-  ClientId: import.meta.env.VITE_COGNITO_CLIENT_ID || 'dummy-client-id'
+  UserPoolId: 'us-east-1_uJiLlyoFF' || 'dummy-user-pool-id',
+  ClientId: '3uff7cmoji5rifqrb7vcvc7eoi' || 'dummy-client-id'
 };
-
-// Environment-specific settings
-// const mfaRequired = import.meta.env.VITE_COGNITO_REQUIRES_MFA === 'true';
-// const redirectUri = import.meta.env.VITE_COGNITO_REDIRECT_URI || window.location.origin;
-
-// Log info about missing configuration in development mode
-if (import.meta.env.DEV && 
-    (!import.meta.env.VITE_COGNITO_USER_POOL_ID || 
-     !import.meta.env.VITE_COGNITO_CLIENT_ID)) {
-  console.warn(
-    'Cognito credentials not found in environment variables. ' +
-    'Please set VITE_COGNITO_USER_POOL_ID and VITE_COGNITO_CLIENT_ID in your .env file. ' +
-    'Using dummy values for development.'
-  );
-}
 
 const userPool = new CognitoUserPool(poolData);
 
