@@ -8,12 +8,15 @@ import {
 import { AuthContext } from './AuthContext';
 import { CognitoUserAttributes } from './AuthTypes';
 
-const poolData = {
-  UserPoolId: 'us-east-1_uJiLlyoFF',
-  ClientId: '3uff7cmoji5rifqrb7vcvc7eoi'
+export const cognitoConfig = {
+  UserPoolId: `us-east-1_uJiLlyoFF`,
+  ClientId: `3uff7cmoji5rifqrb7vcvc7eoi`
 };
 
-const userPool = new CognitoUserPool(poolData);
+const userPool = new CognitoUserPool({
+  UserPoolId: cognitoConfig.UserPoolId,
+  ClientId: cognitoConfig.ClientId,
+})
 
 interface AuthProviderProps {
   children: React.ReactNode;
