@@ -49,7 +49,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const currentUser = userPool.getCurrentUser();
     
     if (currentUser) {
-      currentUser.getSession((err, session) => {
+      currentUser.getSession((err: any, session: CognitoUserSession) => {
         if (err) {
           console.error("Session error:", err);
           setIsAuthenticated(false);
@@ -203,7 +203,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           totpError.name = 'TOTPRequiredError';
           reject(totpError);
         },
-        newPasswordRequired: (userAttributes, requiredAttributes) => {
+        newPasswordRequired: (_userAttributes, _requiredAttributes) => {
           console.log("New password required");
           // Handle new password required
           const newPasswordError = new Error('New password required');
@@ -211,7 +211,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           reject(newPasswordError);
         },
         // Added for completeness, but rarely used in typical setups
-        selectMFAType: (challengeName, challengeParameters) => {
+        selectMFAType: (challengeName, _challengeParameters) => {
           console.log("Select MFA type:", challengeName);
           const selectMfaError = new Error('Please select MFA type');
           selectMfaError.name = 'SelectMFATypeError';
