@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import WorkflowStepDescriptions from '../components/tools/WorkflowStepDescriptions';
+import WorkflowStepDescriptions from './WorkflowStepDescriptions';
 
 const Transfer = () => {
   const API_URL = `${import.meta.env.VITE_API_URL}/transfer`; // Update the .env file with the actual API endpoint
@@ -152,7 +152,7 @@ const Transfer = () => {
         </div>
         
         {/* Use the reusable WorkflowStepDescriptions component */}
-        <WorkflowStepDescriptions step="transfer" />
+        <WorkflowStepDescriptions step="Transfer" />
       </div>
     </div>
   );
