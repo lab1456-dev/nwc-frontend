@@ -20,6 +20,11 @@ jobs:
         run: npm install
 
       - name: Build App
+        env:
+          VITE_COGNITO_USER_POOL_ID: ${{ secrets.VITE_COGNITO_USER_POOL_ID }}
+          VITE_COGNITO_CLIENT_ID: ${{ secrets.VITE_COGNITO_CLIENT_ID }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_PROVISION_API_KEY: ${{ secrets.VITE_PROVISION_API_KEY }}
         run: npm run build
 
       - name: Configure AWS credentials
