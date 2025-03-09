@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import WorkflowStepDescriptions from './WorkflowStepDescriptions';
 
 const Replace = () => {
@@ -330,7 +330,7 @@ const Replace = () => {
                       onChange={(e) => setNewDeviceId(e.target.value)}
                       className="w-full bg-slate-800/50 border border-cyan-900/50 rounded-md px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
                       placeholder={siteId ? "No available Crows at this site" : "Enter new device ID"}
-                      disabled={isLoading || isLoadingCrows || (siteId && availableCrows.length === 0)}
+                      disabled={isLoading || isLoadingCrows || (!!siteId && availableCrows.length === 0)}
                     />
                   )}
                   
