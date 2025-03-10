@@ -11,8 +11,7 @@ import {
 import { 
   FormInput, 
   SubmitButton, 
-  ErrorMessage, 
-  SuccessMessage 
+  ErrorMessage
 } from '../../components/formComponents';
 
 /**

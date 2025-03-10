@@ -104,7 +104,7 @@ const Receive: React.FC = () => {
             <FormInput
               id="crow_id"
               label="Crow ID (scan the QR Code with the Crow image)"
-              value={values.crow_id}
+              value={values.crow_id || ''}
               onChange={(value) => handleChange('crow_id', value)}
               placeholder="Enter Crow ID"
               disabled={isLoading}

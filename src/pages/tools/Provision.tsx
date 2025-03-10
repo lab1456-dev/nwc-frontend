@@ -21,7 +21,7 @@ import { CrowFormData } from '../../types/types';
  */
 const Provision: React.FC = () => {
   // API URL for provisioning
-  const apiUrl = buildApiUrl(API_CONFIG.ENDPOINTS.PROVISION);
+  const apiUrl = buildApiUrl(API_CONFIG.PROVISION_URL);
   
   // Initialize the API request hook
   const { 
@@ -42,6 +42,7 @@ const Provision: React.FC = () => {
   } = useCrowForm<CrowFormData>(
     {
       crow_id: '',
+      site_id: '',
     },
     {
       crow_id: { required: true, message: 'Crow ID is required' },
@@ -61,7 +62,7 @@ const Provision: React.FC = () => {
     
     // Create request headers with API key and step information
     const headers = {
-      'x-api-key': API_CONFIG.API_KEYS.PROVISION,
+      'x-api-key': API_CONFIG.PROVISION_KEY,
       'step': 'provisioned'
     };
     

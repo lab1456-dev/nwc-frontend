@@ -1,38 +1,37 @@
-// src/components/landingPage/FeaturesSection.tsx
 import React from 'react';
-import { FeatureCard } from './FeatureCard';
-import { featuresData } from '../../data/featuresData';
+import { Link } from 'react-router-dom';
+import type { FeatureData } from '../../data/featuresData';
 
-export const FeaturesSection: React.FC = () => {
+/**
+ * Feature Card Component
+ */
+interface FeatureCardProps {
+  feature: FeatureData;
+}
+
+/**
+ * Feature Card component that displays a feature with its icon, title, and description
+ * Links to the feature's dedicated page
+ */
+const FeatureCard: React.FC<FeatureCardProps> = ({ feature }) => {
   return (
-    <section className="bg-gradient-to-b from-cyan-950/50 to-slate-900/50 backdrop-blur-sm py-16">
-      <div className="container mx-auto px-4">
-        <h2 className="text-xl md:text-2xl text-center mb-6 text-cyan-100">
-          Our Oath to Your Security
-        </h2>
-        
-        {/* Roadmap section */}
-        <div className="text-center mb-8">
-          <h2 className="text-xl md:text-2xl text-cyan-200 mb-2">Roadmap:</h2>
-          <div className="flex justify-center space-x-4">
-            <h2 className="text-xl md:text-2xl text-emerald-400">MVP</h2>
-            <h2 className="text-xl md:text-2xl text-yellow-400">2026</h2>
-            <h2 className="text-xl md:text-2xl text-red-400">2027</h2>
-          </div>
+    <Link to={`/${feature.urlPath}`} className="block">  
+      <div className="feature-card">
+        <div className="flex justify-center mb-4">
+          {feature.icon}
         </div>
-
-        {/* Features grid */}
-        <div className="grid md:grid-cols-3 gap-8">
-          {featuresData.map((feature, index) => (
-            <FeatureCard
-              key={index}
-              icon={feature.icon}
-              title={feature.title}
-              description={feature.description}
-            />
-          ))}
-        </div>
+        <h3 className="flex justify-center text-l md:text-2xl text-cyan-200 mb-2">
+          {feature.title}
+        </h3>
+        <p className="flex justify-center to-light-blue-500">
+          {feature.shortDescription}
+        </p>
       </div>
-    </section>
-  );
+    </Link> 
+  ); 
 };
+
+// Add a named export alongside the default export
+export { FeatureCard };
+
+export default FeatureCard;

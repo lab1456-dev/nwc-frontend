@@ -12,8 +12,7 @@ import {
   FormInput, 
   FormSelect,
   SubmitButton, 
-  ErrorMessage, 
-  SuccessMessage 
+  ErrorMessage
 } from '../../components/formComponents';
 import { CrowFormData, WorkflowStep } from '../../types/types';
 
@@ -48,8 +47,7 @@ const SuspendReactivate: React.FC = () => {
     values, 
     errors, 
     handleChange, 
-    validateForm, 
-    resetForm 
+    validateForm
   } = useCrowForm<SuspendReactivateFormData>(
     {
       crow_id: '',

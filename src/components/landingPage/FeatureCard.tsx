@@ -9,6 +9,10 @@ interface FeatureCardProps {
   feature: FeatureData;
 }
 
+/**
+ * Feature Card component that displays a feature with its icon, title, and description
+ * Links to the feature's dedicated page
+ */
 const FeatureCard: React.FC<FeatureCardProps> = ({ feature }) => {
   return (
     <Link to={`/${feature.urlPath}`} className="block">  
@@ -26,3 +30,5 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ feature }) => {
     </Link> 
   ); 
 };
+
+export default FeatureCard;

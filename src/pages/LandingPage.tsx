@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import Crow from '../components/common/Logo';
 import { getAllFeatures } from '../data/featuresData';
@@ -33,8 +33,6 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ feature }) => {
  * Landing Page Component
  */
 const LandingPage: React.FC = () => {
-  // State for style guide visibility
-  const [showStyleGuide, setShowStyleGuide] = useState(false);
 
   // Get features data from our unified data structure
   const features = getAllFeatures();
