@@ -36,6 +36,6 @@ jobs:
 
       - name: Sync files to S3
         run: |
-          aws s3 sync dist s3://nwcrow --delete [--no-guess-mime-type
+          aws s3 sync dist s3://nwcrow --delete --no-guess-mime-type
 
 
