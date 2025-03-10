@@ -36,8 +36,6 @@ jobs:
 
       - name: Sync files to S3
         run: |
-          aws s3 sync dist s3://nwcrow --include "*.css" --content-type text/css --delete
-          aws s3 sync dist s3://nwcrow --include "*.js" --content-type application/javascript --delete
-          aws s3 sync dist s3://nwcrow --include "*.html" --content-type text/html --delete
-          aws s3 sync dist s3://nwcrow --include "*.png" --content-type image/png --delete
+          aws s3 sync dist s3://nwcrow --delete --exclude '*.css'
+          aws s3 sync dist s3://nwcrow  --delete --exclude '*' --include '*.css' --content-type 'text/css'
 
