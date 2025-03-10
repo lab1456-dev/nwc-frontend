@@ -7,4 +7,4 @@ const IntrusionDetection: React.FC = () => {
   
   return <FeaturePageLayout {...featureData} />;
 };
-export default IntrustionDetection;
+export default IntrusionDetection;

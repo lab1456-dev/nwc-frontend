@@ -1,6 +1,5 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { getAllFeatures } from '../../data/featuresData';
 import type { FeatureData } from '../../data/featuresData';
 
 /**
