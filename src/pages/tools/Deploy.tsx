@@ -117,7 +117,7 @@ const Deploy: React.FC = () => {
             <FormInput
               id="site_id"
               label="Site ID"
-              value={values.site_id}
+              value={values.site_id || ''}
               onChange={(value) => handleChange('site_id', value)}
               placeholder="Enter site ID"
               disabled={isLoading}
