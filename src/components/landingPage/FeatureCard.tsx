@@ -31,4 +31,7 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ feature }) => {
   ); 
 };
 
+// Add a named export alongside the default export
+export { FeatureCard };
+
 export default FeatureCard;

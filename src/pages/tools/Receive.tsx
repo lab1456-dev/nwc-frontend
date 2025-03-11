@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import WorkflowStepDescriptions from '../../data/WorkflowStepDescriptions';
 import { useCrowForm } from '../../hooks/useCrowForm';
 import { useApiRequest } from '../../hooks/useApiRequest';
 import { API_CONFIG, buildApiUrl } from '../../services/apiService';
+import { AuthContext } from '../../contexts/AuthContext';
 import { 
   PageContainer, 
   PageHeader, 
@@ -22,6 +23,9 @@ import { CrowFormData } from '../../types/types';
 const Receive: React.FC = () => {
   // API URL for receiving
   const apiUrl = buildApiUrl(API_CONFIG.ENDPOINTS.RECEIVE);
+  
+  // Get authentication context to access the Cognito token
+  const { getAuthToken } = useContext(AuthContext);
   
   // Initialize the API request hook
   const { 
@@ -61,9 +65,17 @@ const Receive: React.FC = () => {
       return;
     }
     
-    // Create request headers with Crow authentication
+    // Get the current auth token from Cognito
+    const token = await getAuthToken();
+    
+    if (!token) {
+      // Handle case where token is missing
+      return;
+    }
+    
+    // Create request headers with Cognito JWT token
     const headers = {
-      'Authorization': `Crow ${values.crow_id}`,
+      'Authorization': `Bearer ${token}`,
       'step': 'received'
     };
     

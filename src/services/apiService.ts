@@ -37,6 +37,8 @@ export const getAuthHeader = (
   switch (authType) {
     case 'Crow':
     case 'Device':
+      // Legacy auth types - consider deprecating
+      console.warn(`Using deprecated auth type: ${authType}`);
       return { 'Authorization': `${authType} ${id}` };
     case 'Bearer':
       return { 'Authorization': `Bearer ${id}` };
@@ -70,14 +72,14 @@ export interface CrowData {
 // Deploy a Crow to a work cell
 export const deployCrow = async (
   data: CrowData,
-  crowId: string
+  token: string
 ): Promise<ApiResponse> => {
   try {
     const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.DEPLOY), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...getAuthHeader('Crow', crowId),
+        ...getAuthHeader('Bearer', token),
         'step': 'deployed'
       },
       body: JSON.stringify(data),

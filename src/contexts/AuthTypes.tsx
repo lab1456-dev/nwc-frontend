@@ -27,4 +27,5 @@ export interface AuthContextType {
   signOut: () => void;
   loading: boolean;
   mfaRequired: boolean;
+  getAuthToken: () => Promise<string | null>;  // New method to get the auth token
 }

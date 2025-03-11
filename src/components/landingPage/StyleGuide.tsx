@@ -24,3 +24,5 @@ export const StyleGuide: React.FC<StyleGuideProps> = ({ onClose }) => {
     </div>
   );
 };
+
+export default StyleGuide

@@ -1,9 +1,9 @@
 import React, { useState, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, X, ChevronDown, ChevronRight, LogIn, LogOut } from 'lucide-react';
-import { AuthContext } from '../contexts/AuthContext';
-import Crow from './common/Logo';
-import { featureLinks, toolLinks } from '../data/navigationLinks';
+import { AuthContext } from '../../contexts/AuthContext';
+import Crow from './Logo';
+import { featureLinks, toolLinks } from '../../data/navigationLinks';
 
 /**
  * Navigation component - Main application navigation with responsive mobile menu

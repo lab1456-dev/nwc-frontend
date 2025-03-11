@@ -1,9 +1,13 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
-//Tools - Require Auth
-import RequiredAuth from "./components/RequiredAuth";
-import SignInPage from './components/SignInPage';
-import Navigation from './components/Navigation';
+
+//Common Components
+import RequiredAuth from "./components/common/RequiredAuth";
+import SignInPage from './components/common/SignInPage';
+import Navigation from './components/common/Navigation';
+import Footer from './components/common/Footer';
+
+//Pages
 import LandingPage from './pages/LandingPage';
 import Provision from './pages/tools/Provision';
 import Receive from './pages/tools/Receive';
@@ -12,6 +16,7 @@ import Replace from './pages/tools/Replace';
 import Transfer from './pages/tools/Transfer';
 import SuspendReactivate from './pages/tools/SuspendReactivate';
 import Retire from './pages/tools/Retire';
+
 //Features - Everyone
 import AddressTranslation from './pages/features/AddressTranslation';
 import AssetDiscovery from './pages/features/AssetDiscovery';
@@ -74,6 +79,7 @@ const App: React.FC = () => {
           <Route path="/vulnerability-assessment" element={<VulnerabilityAssessment />} />
         </Routes>
       </ScrollToTop>
+      <Footer />
     </main>
   );
 };

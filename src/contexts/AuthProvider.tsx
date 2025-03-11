@@ -218,6 +218,31 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setMfaPending(false);
     }
   };
+  
+  // Get JWT token function
+  const getAuthToken = async (): Promise<string | null> => {
+    return new Promise((resolve) => {
+      const currentUser = userPool.getCurrentUser();
+      
+      if (!currentUser) {
+        resolve(null);
+        return;
+      }
+      
+      currentUser.getSession((err: Error | null, session: CognitoUserSession | null) => {
+        if (err || !session) {
+          console.error("Error getting session:", err);
+          resolve(null);
+          return;
+        }
+        
+        // Return the JWT token from the session
+        // For API calls, you typically want the access token
+        const token = session.getAccessToken().getJwtToken();
+        resolve(token);
+      });
+    });
+  };
 
   return (
     <AuthContext.Provider value={{ 
@@ -226,7 +251,8 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       signIn, 
       signOut, 
       loading,
-      mfaRequired: mfaPending
+      mfaRequired: mfaPending,
+      getAuthToken
     }}>
       {children}
     </AuthContext.Provider>

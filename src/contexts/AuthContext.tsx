@@ -10,7 +10,11 @@ export const AuthContext = createContext<AuthContextType>({
   },
   signOut: () => {},
   loading: true,
-  mfaRequired: false
+  mfaRequired: false,
+  getAuthToken: async () => {
+    throw new Error("Auth context not initialized");
+    return null;
+  }
 });
 
 // Export the context consumer for convenience
