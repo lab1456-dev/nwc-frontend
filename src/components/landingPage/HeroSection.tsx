@@ -23,3 +23,4 @@ export const HeroSection: React.FC = () => {
     </header>
   );
 };
+export default HeroSection;

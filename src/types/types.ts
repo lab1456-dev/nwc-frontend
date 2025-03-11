@@ -5,7 +5,7 @@
 // Form data types
 export interface CrowFormData {
   crow_id: string;
-  site_id: string;
+  site_id?: string;
   work_cell_id?: string;
 }
 

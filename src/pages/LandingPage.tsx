@@ -1,5 +1,5 @@
 import React from 'react';
-import Crow from '../components/common/Logo';
+import HeroSection from '../components/landingPage/HeroSection';
 import FeatureSection from '../components/landingPage/FeatureSection';
 
 /**
@@ -10,24 +10,7 @@ const LandingPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-cyan-950 to-slate-900 text-gray-100">
       {/* Hero Section */}
-      <header className="container mx-auto px-4 py-16">
-        <div className="text-center mb-8">
-          <p className="text-3xl font-bold text-center mb-6 text-cyan-100">
-            The Shield that Guards the Realms of Your Network
-          </p>
-        </div>
-        
-        <div className="flex justify-center">
-          <Crow          
-            width="w-36" 
-            height="h-36" 
-            className="mx-auto"
-            shadow={true}
-            hover={true}
-          />
-        </div>
-      </header>
-
+\     <HeroSection />
       {/* Main Features */}
       <FeatureSection />
 

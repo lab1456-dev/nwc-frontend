@@ -1,7 +1,7 @@
 import React, { useContext } from 'react';
 import WorkflowStepDescriptions from '../../data/WorkflowStepDescriptions';
 import { useCrowForm } from '../../hooks/useCrowForm';
-import { useApiRequest } from '../../hooks/useApiRequest';
+import { useAuthenticatedRequest } from '../../hooks/useAuthenticatedRequest';
 import { API_CONFIG, buildApiUrl } from '../../services/apiService';
 import { AuthContext } from '../../contexts/AuthContext';
 import { 
@@ -24,17 +24,17 @@ const Receive: React.FC = () => {
   // API URL for receiving
   const apiUrl = buildApiUrl(API_CONFIG.ENDPOINTS.RECEIVE);
   
-  // Get authentication context to access the Cognito token
-  const { getAuthToken } = useContext(AuthContext);
+  // Get auth context for user information if needed
+  const { user } = useContext(AuthContext);
   
-  // Initialize the API request hook
+  // Initialize the authenticated API request hook
   const { 
     makeRequest, 
     isLoading, 
     error, 
     success, 
     setSuccess 
-  } = useApiRequest(apiUrl);
+  } = useAuthenticatedRequest(apiUrl);
   
   // Initialize the form hook with validation rules
   const { 
@@ -65,28 +65,34 @@ const Receive: React.FC = () => {
       return;
     }
     
-    // Get the current auth token from Cognito
-    const token = await getAuthToken();
-    
-    if (!token) {
-      // Handle case where token is missing
-      return;
-    }
-    
-    // Create request headers with Cognito JWT token
-    const headers = {
-      'Authorization': `Bearer ${token}`,
+    // Define any additional headers needed for this specific API
+    const additionalHeaders: Record<string, string> = {
       'step': 'received'
     };
     
-    // Make the API request
-    await makeRequest(
+    // Add user context headers if available
+    if (user) {
+      if (user.email) {
+        additionalHeaders['x-user-email'] = user.email;
+      }
+      if (user.sub) {
+        additionalHeaders['x-user-sub'] = user.sub;
+      }
+    }
+    
+    // Make the authenticated API request
+    const result = await makeRequest(
       { 
         crow_id: values.crow_id,
         site_id: values.site_id
       },
-      headers
+      additionalHeaders
     );
+    
+    // Optionally handle specific response details
+    if (result.success) {
+      console.log('Crow successfully received:', result.data);
+    }
   };
 
   /**
@@ -133,7 +139,7 @@ const Receive: React.FC = () => {
               error={errors.site_id}
             />
             
-            <ErrorMessage message={error} />
+            <ErrorMessage message={error || ''} />
             
             <div className="flex justify-center">
               <SubmitButton

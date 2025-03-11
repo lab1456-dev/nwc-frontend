@@ -101,4 +101,97 @@ export const deployCrow = async (
   }
 };
 
-// Add other API service functions as needed
+/**
+ * Make an authenticated request to API Gateway using Cognito token
+ * 
+ * @param endpoint - The API endpoint to call
+ * @param data - The request body
+ * @param token - The Cognito JWT token
+ * @param additionalHeaders - Any additional headers to include
+ * @returns Promise with the API response
+ */
+export const makeAuthenticatedRequest = async <T = any>(
+  endpoint: string,
+  data: Record<string, any>,
+  token: string,
+  additionalHeaders: Record<string, string> = {},
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'POST'
+): Promise<ApiResponse<T>> => {
+  try {
+    const url = buildApiUrl(endpoint);
+    
+    // Configure fetch options with authorization header
+    const fetchOptions: RequestInit = {
+      method: method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeader('Bearer', token),
+        ...additionalHeaders
+      }
+    };
+    
+    // Add body for non-GET requests
+    if (method !== 'GET') {
+      fetchOptions.body = JSON.stringify(data);
+    }
+    
+    // Make the request
+    const response = await fetch(url, fetchOptions);
+    
+    // Handle different response types
+    let responseData: any;
+    const contentType = response.headers.get('content-type');
+    
+    if (contentType && contentType.includes('application/json')) {
+      responseData = await response.json();
+    } else {
+      responseData = await response.text();
+    }
+    
+    // Check for common API Gateway error patterns
+    if (!response.ok) {
+      // Handle specific API Gateway error codes
+      if (response.status === 403) {
+        console.warn('Authentication error: Invalid or expired token');
+      } else if (response.status === 429) {
+        console.warn('Rate limit exceeded');
+      }
+      
+      return {
+        success: false,
+        message: typeof responseData === 'object' && responseData.message 
+          ? responseData.message 
+          : `Request failed with status: ${response.status}`
+      };
+    }
+    
+    return {
+      success: true,
+      data: responseData
+    };
+  } catch (error) {
+    console.error('API request error:', error);
+    return {
+      success: false,
+      message: 'Network or server error occurred'
+    };
+  }
+};
+
+/**
+ * Receive a Crow at a specific site
+ * @param data The Crow and Site data
+ * @param token Cognito JWT token
+ */
+export const receiveCrow = async (
+  data: CrowData,
+  token: string
+): Promise<ApiResponse> => {
+  return makeAuthenticatedRequest(
+    API_CONFIG.ENDPOINTS.RECEIVE,
+    data,
+    token,
+    { 'step': 'received' }
+  );
+};
+
