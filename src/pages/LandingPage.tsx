@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { Info, ChevronDown } from 'lucide-react';
+import React from 'react';
 import Crow from '../components/common/Logo';
 import FeatureSection from '../components/landingPage/FeatureSection';
 
