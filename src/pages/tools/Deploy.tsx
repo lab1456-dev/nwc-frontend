@@ -134,7 +134,8 @@ const Deploy: React.FC = () => {
               error={errors.work_cell_id}
             />
             
-            <ErrorMessage message={error} />
+            <ErrorMessage message={String(error || '')} />
+
             
             <div className="flex justify-center">
               <SubmitButton

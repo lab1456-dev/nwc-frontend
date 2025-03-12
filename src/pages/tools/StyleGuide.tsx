@@ -1,10 +1,9 @@
 import React from 'react';
 
 interface StyleGuideProps {
-  onClose: () => void;
 }
 
-const StyleGuide: React.FC<StyleGuideProps> = ({ onClose }) => {
+const StyleGuide: React.FC<StyleGuideProps> = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-gray-100 py-16 px-4 fixed inset-0 z-40 overflow-auto">
       <div className="container mx-auto">
@@ -169,15 +168,6 @@ const StyleGuide: React.FC<StyleGuideProps> = ({ onClose }) => {
             </div>
           </div>
         </section>
-        
-        <div className="text-center">
-          <button 
-            onClick={onClose} 
-            className="cta-button"
-          >
-            Close Style Guide
-          </button>
-        </div>
       </div>
     </div>
   );

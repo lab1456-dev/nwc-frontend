@@ -96,5 +96,10 @@ export const toolLinks = [
   {
     path: '/retire',
     label: 'Retire'
+  },
+  {
+    path: '/styleguide',
+    label: 'Style Guide'
   }
+
 ];

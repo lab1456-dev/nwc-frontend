@@ -180,7 +180,7 @@ const Retire: React.FC = () => {
               {errors.confirmation_text && <p className="text-red-400 text-sm mt-1">{errors.confirmation_text}</p>}
             </div>
             
-            <ErrorMessage message={error} />
+            <ErrorMessage message={String(error || '')} />
             
             <div className="flex justify-center">
               <button

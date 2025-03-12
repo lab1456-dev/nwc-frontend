@@ -232,7 +232,7 @@ const SuspendReactivate: React.FC = () => {
               />
             )}
             
-            <ErrorMessage message={error} />
+            <ErrorMessage message={String(error || '')} />
             
             <div className="flex justify-center">
               <SubmitButton

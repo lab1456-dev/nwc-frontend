@@ -16,6 +16,7 @@ import Replace from './pages/tools/Replace';
 import Transfer from './pages/tools/Transfer';
 import SuspendReactivate from './pages/tools/SuspendReactivate';
 import Retire from './pages/tools/Retire';
+import StyleGuide from './pages/tools/StyleGuide';
 
 //Features - Everyone
 import AddressTranslation from './pages/features/AddressTranslation';
@@ -62,6 +63,7 @@ const App: React.FC = () => {
           <Route path="/transfer" element={<RequiredAuth><Transfer /></RequiredAuth>} />
           <Route path="/suspendreactivate" element={<RequiredAuth><SuspendReactivate /></RequiredAuth>} />
           <Route path="/retire" element={<RequiredAuth><Retire /></RequiredAuth>} />
+          <Route path="/styleguide" element={<RequiredAuth><StyleGuide /></RequiredAuth>} />
           <Route path="/address-translation" element={<AddressTranslation />} />
           <Route path="/asset-discovery" element={<AssetDiscovery />} />
           <Route path="/deep-packet-inspection" element={<DeepPacketInspection />} />

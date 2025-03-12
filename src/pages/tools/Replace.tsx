@@ -394,7 +394,7 @@ const Replace: React.FC = () => {
               {errors.new_crow_id && <p className="text-red-400 text-sm mt-1">{errors.new_crow_id}</p>}
             </div>
             
-            <ErrorMessage message={error} />
+            <ErrorMessage message={String(error || '')} />
             
             <div className="flex justify-center">
               <button

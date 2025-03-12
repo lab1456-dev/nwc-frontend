@@ -133,7 +133,7 @@ const Receive: React.FC = () => {
               error={errors.site_id}
             />
             
-            <ErrorMessage message={error} />
+            <ErrorMessage message={String(error || '')} />
             
             <div className="flex justify-center">
               <SubmitButton
