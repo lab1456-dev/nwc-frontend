@@ -3,7 +3,6 @@ import { AuthContext } from '../contexts/AuthContext';
 import { 
   ApiResponse, 
   makeApiRequest, 
-  buildApiUrl,
   API_CONFIG 
 } from '../services/apiService';
 
