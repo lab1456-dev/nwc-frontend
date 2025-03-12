@@ -17,11 +17,23 @@ import {
 import { CrowFormData } from '../../types/types';
 
 /**
- * Provision component - Handles registering a new Crow in the system
+ * Extended CrowFormData interface with additional hardware fields
+ */
+interface ExtendedCrowFormData extends Partial<CrowFormData> {
+  manufacturer: string | null;
+  model: string | null;
+  cpu: string | null;
+  ram: string | null;
+  storage: string | null;
+  os_image_version: string | null;
+}
+
+/**
+ * Provision component - Handles registering a new Crow in the system with hardware details
  */
 const Provision: React.FC = () => {
-  // API URL for provisioning
-  const apiUrl = buildApiUrl(API_CONFIG.PROVISION_URL);
+  // Build the API URL once and correctly
+  const apiUrl = buildApiUrl(API_CONFIG.ENDPOINTS.PROVISION);
   
   // Initialize the API request hook
   const { 
@@ -32,20 +44,32 @@ const Provision: React.FC = () => {
     setSuccess 
   } = useApiRequest(apiUrl);
   
-  // Initialize the form hook with validation rules
+  // Initialize the form hook with validation rules for all required fields
   const { 
     values, 
     errors, 
     handleChange, 
     validateForm, 
     resetForm 
-  } = useCrowForm<CrowFormData>(
+  } = useCrowForm<ExtendedCrowFormData>(
     {
       crow_id: '',
-      site_id: '',
+      manufacturer: '',
+      model: '',
+      cpu: '',
+      ram: '',
+      storage: '',
+      os_image_version: '',
+      site_id: ''
     },
     {
       crow_id: { required: true, message: 'Crow ID is required' },
+      manufacturer: { required: true, message: 'Manufacturer is required' },
+      model: { required: true, message: 'Model is required' },
+      cpu: { required: true, message: 'CPU information is required' },
+      ram: { required: true, message: 'RAM specification is required' },
+      storage: { required: true, message: 'Storage information is required' },
+      os_image_version: { required: true, message: 'OS Image Version is required' }
     }
   );
 
@@ -66,10 +90,16 @@ const Provision: React.FC = () => {
       'step': 'provisioned'
     };
     
-    // Make the API request
+    // Make the API request with all the hardware details
     await makeRequest(
       { 
-        crow_id: values.crow_id.toUpperCase(),
+        crow_id: values.crow_id || '',
+        manufacturer: values.manufacturer || '',
+        model: values.model || '',
+        cpu: values.cpu || '',
+        ram: values.ram || '',
+        storage: values.storage || '',
+        os_image_version: values.os_image_version || ''
       },
       headers
     );
@@ -101,15 +131,75 @@ const Provision: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-6">
             <FormInput
               id="crow_id"
-              label="Crow ID"
-              value={values.crow_id}
+              label="Crow ID (scan the QR Code with the Crow image)"
+              value={values.crow_id || ''}
               onChange={(value) => handleChange('crow_id', value)}
               placeholder="Enter Crow ID"
               disabled={isLoading}
               error={errors.crow_id}
             />
+
+            <FormInput
+              id="manufacturer"
+              label="Manufacturer"
+              value={values.manufacturer || ''}
+              onChange={(value) => handleChange('manufacturer', value)}
+              placeholder="Enter device manufacturer"
+              disabled={isLoading}
+              error={errors.manufacturer}
+            />
+
+            <FormInput
+              id="model"
+              label="Model"
+              value={values.model || ''}
+              onChange={(value) => handleChange('model', value)}
+              placeholder="Enter device model"
+              disabled={isLoading}
+              error={errors.model}
+            />
+
+            <FormInput
+              id="cpu"
+              label="CPU"
+              value={values.cpu || ''}
+              onChange={(value) => handleChange('cpu', value)}
+              placeholder="Enter CPU specification"
+              disabled={isLoading}
+              error={errors.cpu}
+            />
+
+            <FormInput
+              id="ram"
+              label="RAM"
+              value={values.ram || ''}
+              onChange={(value) => handleChange('ram', value)}
+              placeholder="Enter RAM amount (e.g., 8GB)"
+              disabled={isLoading}
+              error={errors.ram}
+            />
+
+            <FormInput
+              id="storage"
+              label="Storage"
+              value={values.storage || ''}
+              onChange={(value) => handleChange('storage', value)}
+              placeholder="Enter storage capacity (e.g., 256GB)"
+              disabled={isLoading}
+              error={errors.storage}
+            />
+
+            <FormInput
+              id="os_image_version"
+              label="OS Image Version"
+              value={values.os_image_version || ''}
+              onChange={(value) => handleChange('os_image_version', value)}
+              placeholder="Enter OS image version"
+              disabled={isLoading}
+              error={errors.os_image_version}
+            />
             
-            <ErrorMessage message={error} />
+            <ErrorMessage message={error || ''} />
             
             <div className="flex justify-center">
               <SubmitButton

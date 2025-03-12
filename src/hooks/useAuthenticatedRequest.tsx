@@ -1,13 +1,18 @@
 import { useState, useContext, useCallback } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
-import { ApiResponse, buildApiUrl } from '../services/apiService';
+import { 
+  ApiResponse, 
+  makeApiRequest, 
+  buildApiUrl,
+  API_CONFIG 
+} from '../services/apiService';
 
 /**
  * Custom hook that combines API requests with Cognito authentication
  * 
- * @param endpoint - The API endpoint to call
+ * @param endpointPath - The API endpoint path (not the full URL)
  */
-export const useAuthenticatedRequest = (endpoint: string) => {
+export const useAuthenticatedRequest = (endpointPath: string) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -35,71 +40,50 @@ export const useAuthenticatedRequest = (endpoint: string) => {
     setIsLoading(true);
     
     try {
-      // Check if user is authenticated
-      if (!isAuthenticated) {
-        throw new Error('User is not authenticated');
-      }
+      let token: string | null = null;
       
-      // Get the Cognito token
-      const token = await getAuthToken();
-      
-      if (!token) {
-        throw new Error('Failed to get authentication token');
-      }
-      
-      // Prepare request URL and options
-      const url = buildApiUrl(endpoint);
-      const fetchOptions: RequestInit = {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          ...additionalHeaders
+      // For non-provision endpoints, we need authentication
+      if (endpointPath !== API_CONFIG.ENDPOINTS.PROVISION) {
+        // Check if user is authenticated
+        if (!isAuthenticated) {
+          throw new Error('User is not authenticated');
         }
-      };
-      
-      // Add body for non-GET requests
-      if (method !== 'GET') {
-        fetchOptions.body = JSON.stringify(requestData);
+        
+        // Get the Cognito token
+        token = await getAuthToken();
+        
+        if (!token) {
+          throw new Error('Failed to get authentication token');
+        }
       }
       
-      // Make the request
-      const response = await fetch(url, fetchOptions);
-      
-      // Parse response based on content type
-      let responseData: any;
-      const contentType = response.headers.get('content-type');
-      
-      if (contentType && contentType.includes('application/json')) {
-        responseData = await response.json();
-      } else {
-        responseData = await response.text();
-      }
+      // Make the request with the appropriate authentication
+      const result = await makeApiRequest<T>(
+        endpointPath,
+        requestData,
+        token || undefined,
+        additionalHeaders,
+        method
+      );
       
       // Handle API response
-      if (response.ok) {
+      if (result.success) {
         setSuccess(true);
-        setData(responseData);
-        return { success: true, data: responseData as T };
+        setData(result.data);
       } else {
-        // Extract error message from response if available
-        const errorMessage = 
-          (typeof responseData === 'object' && responseData.message) 
-            ? responseData.message 
-            : `Request failed with status: ${response.status}`;
-        
-        setError(errorMessage);
-        return { success: false, message: errorMessage };
+        setError(result.message || 'Unknown error occurred');
       }
+      
+      setIsLoading(false);
+      return result;
     } catch (error: any) {
       const errorMessage = error.message || 'An unexpected error occurred';
       setError(errorMessage);
       console.error('API request error:', error);
-      return { success: false, message: errorMessage };
-    } finally {
       setIsLoading(false);
+      return { success: false, message: errorMessage };
     }
-  }, [endpoint, isAuthenticated, getAuthToken]);
+  }, [endpointPath, isAuthenticated, getAuthToken]);
   
   /**
    * Reset the state of the hook
