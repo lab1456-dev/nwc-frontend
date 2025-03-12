@@ -13,7 +13,9 @@ export const API_CONFIG = {
     MONITOR_STATUS: '/monitor-status',
     RETIRE: '/retire',
     GET_CROWS: '/getcrows',
-    NON_DEPLOYED_CROWS: '/non-deployed-crows-at-site'
+    NON_DEPLOYED_CROWS: '/non-deployed-crows-at-site',
+    GET_CROW_MODELS: '/getcrowmodels',
+    GET_ACTIVE_OS_IMAGES: '/getactiveosimages'
   }
 };
 
@@ -87,7 +89,9 @@ export const getAuthHeadersForEndpoint = (
   token?: string
 ): Record<string, string> => {
   // For provision endpoint, use API key authentication
-  if (endpoint === API_CONFIG.ENDPOINTS.PROVISION) {
+  if (endpoint === API_CONFIG.ENDPOINTS.PROVISION || 
+      endpoint === API_CONFIG.ENDPOINTS.GET_CROW_MODELS || 
+      endpoint === API_CONFIG.ENDPOINTS.GET_ACTIVE_OS_IMAGES) {
     return getAuthHeader('ApiKey');
   }
   
@@ -288,5 +292,36 @@ export const getNonDeployedCrowsAtSite = async (
     API_CONFIG.ENDPOINTS.NON_DEPLOYED_CROWS,
     { site_id: siteId },
     token
+  );
+};
+
+/**
+ * Get all manufacturers or models for a specific manufacturer
+ * @param manufacturer Manufacturer ID or "*" to get all manufacturers
+ * @param models Model ID or "*" to get all models for a manufacturer
+ */
+export const getCrowModels = async (
+  manufacturer: string = "*",
+  models: string = "*"
+): Promise<ApiResponse> => {
+  return makeApiRequest(
+    API_CONFIG.ENDPOINTS.GET_CROW_MODELS,
+    { manufacturer, models },
+    undefined,  // No token needed
+    {},  // No additional headers
+    'GET'  // GET method
+  );
+};
+
+/**
+ * Get all active OS images
+ */
+export const getActiveOsImages = async (): Promise<ApiResponse> => {
+  return makeApiRequest(
+    API_CONFIG.ENDPOINTS.GET_ACTIVE_OS_IMAGES,
+    {},
+    undefined,  // No token needed
+    {},  // No additional headers
+    'GET'  // GET method
   );
 };
