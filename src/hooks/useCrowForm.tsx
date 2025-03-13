@@ -6,6 +6,7 @@ import { useState } from 'react';
 interface FieldValidation {
   required?: boolean;
   message?: string;
+  validate?: (value: string) => string;  // Add this line
 }
 
 interface FieldValidations {

@@ -15,7 +15,8 @@ export const API_CONFIG = {
     GET_CROWS: '/getcrows',
     NON_DEPLOYED_CROWS: '/non-deployed-crows-at-site',
     GET_CROW_MODELS: '/getcrowmodels',
-    GET_ACTIVE_OS_IMAGES: '/getactiveosimages'
+    GET_ACTIVE_OS_IMAGES: '/getactiveosimages',
+    USER_GROUPS: '/usergroups'  // New endpoint for user groups
   }
 };
 

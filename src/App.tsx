@@ -6,6 +6,7 @@ import RequiredAuth from "./components/common/RequiredAuth";
 import SignInPage from './components/common/SignInPage';
 import Navigation from './components/common/Navigation';
 import Footer from './components/common/Footer';
+import Unauthorized from './components/common/Unauthorized';
 
 //Pages
 import LandingPage from './pages/LandingPage';
@@ -56,6 +57,7 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/signin" element={<SignInPage />} />
+          <Route path="/unauthorized" element={<Unauthorized />} />
           <Route path="/provision" element={<RequiredAuth><Provision /></RequiredAuth>} />
           <Route path="/receive" element={<RequiredAuth><Receive /></RequiredAuth>} />
           <Route path="/deploy" element={<RequiredAuth><Deploy /></RequiredAuth>} />
