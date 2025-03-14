@@ -1,22 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import WorkflowStepDescriptions from '../../data/WorkflowStepDescriptions';
 import { useCrowForm } from '../../hooks/useCrowForm';
-import { useApiRequest } from '../../hooks/useApiRequest';
-import { API_CONFIG, buildApiUrl } from '../../services/apiService';
+import { AuthContext } from '../../contexts/AuthContext';
 import { 
   PageContainer, 
   PageHeader, 
   ContentCard 
 } from '../../components/layoutComponents';
-import {  
-  ErrorMessage
+import { 
+  FormInput, 
+  SubmitButton, 
+  ErrorMessage,
+  SuccessMessage 
 } from '../../components/formComponents';
 import { CrowFormData } from '../../types/types';
+
+// Import from the new API service
+import { replaceCrow } from '../../services/api/userApi';
+import { getCrows } from '../../services/api/formApi';
+import { Crow } from '../../services/api/apiTypes';
 
 /**
  * Interface for Replace form data
  */
-interface ReplaceFormData extends CrowFormData {
+interface ReplaceFormData extends Partial<CrowFormData> {
   existing_crow_id: string;
   new_crow_id: string;
 }
@@ -25,19 +33,17 @@ interface ReplaceFormData extends CrowFormData {
  * Replace component - Handles replacing a Crow with a new one
  */
 const Replace: React.FC = () => {
-  // API URLs
-  const replaceUrl = buildApiUrl(API_CONFIG.ENDPOINTS.REPLACE);
-  const crowAssociationUrl = buildApiUrl(API_CONFIG.ENDPOINTS.GET_CROWS);
-  const nonDeployedCrowsUrl = buildApiUrl(API_CONFIG.ENDPOINTS.NON_DEPLOYED_CROWS);
+  const navigate = useNavigate();
+  const { isAuthenticated, getAuthToken } = useContext(AuthContext);
   
-  // State for API requests
-  const { makeRequest, isLoading, error, success, setSuccess } = useApiRequest(replaceUrl);
+  // State for API communication
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [responseData, setResponseData] = useState<any>(null);
   
-  // State for crow lookup API request
-  const [crowAssociationLoading, setCrowAssociationLoading] = useState(false);
-  const [crowAssociationError, setCrowAssociationError] = useState('');
-  
-  // State for available crows
+  // State for crow data operations
+  const [crowLookupLoading, setCrowLookupLoading] = useState(false);
   const [availableCrows, setAvailableCrows] = useState<string[]>([]);
   const [isLoadingCrows, setIsLoadingCrows] = useState(false);
   
@@ -53,7 +59,7 @@ const Replace: React.FC = () => {
     {
       existing_crow_id: '',
       new_crow_id: '',
-      crow_id: '', // Required by CrowFormData but not used in this component
+      crow_id: '', // Required by CrowFormData but not used directly
       site_id: '',
       work_cell_id: ''
     },
@@ -65,6 +71,14 @@ const Replace: React.FC = () => {
     }
   );
 
+  // Check for authentication
+  useEffect(() => {
+    if (!isAuthenticated) {
+      // Redirect to login if not authenticated
+      navigate('/login', { state: { returnUrl: '/replace' } });
+    }
+  }, [isAuthenticated, navigate]);
+
   /**
    * Function to fetch Crow association data
    */
@@ -73,36 +87,42 @@ const Replace: React.FC = () => {
       return;
     }
 
-    setCrowAssociationLoading(true);
-    setCrowAssociationError('');
+    setCrowLookupLoading(true);
+    setError(null);
     
     try {
-      const response = await fetch(`${crowAssociationUrl}\\getcrow`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Device ${values.existing_crow_id}`,
-          'crow_id': `${values.existing_crow_id}`,
-          'status': 'deployed'
-        }
-      });
+      const token = await getAuthToken();
+      if (!token) {
+        setError('Authentication required. Please log in again.');
+        navigate('/login', { state: { returnUrl: '/replace' } });
+        return;
+      }
       
-      if (response.status === 200) {
-        const data = await response.json();
+      // Get information about the existing crow
+      const response = await getCrows(
+        {
+          crow_id: values.existing_crow_id.trim(),
+          status: 'deployed'
+        },
+        token
+      );
+      
+      if (response.success && response.data && response.data.crows.length > 0) {
+        const deployedCrow = response.data.crows[0];
         
         // Update form values with fetched data
         setValues(prev => ({
           ...prev,
-          site_id: data.site_id || '',
-          work_cell_id: data.work_cell_id || ''
+          site_id: deployedCrow.site_id || '',
+          work_cell_id: deployedCrow.work_cell_id || ''
         }));
         
         // After getting site info, fetch available Crows
-        if (data.site_id) {
-          fetchNonDeployedCrows(data.site_id);
+        if (deployedCrow.site_id) {
+          fetchNonDeployedCrows(deployedCrow.site_id);
         }
       } else {
-        const errorData = await response.json();
-        setCrowAssociationError(errorData.message || 'Failed to retrieve Crow association information');
+        setError(response.message || 'Crow not found or not in deployed status');
         
         // Reset form values
         setValues(prev => ({
@@ -113,9 +133,9 @@ const Replace: React.FC = () => {
         
         setAvailableCrows([]);
       }
-    } catch (error) {
-      console.error('Error fetching Crow association:', error);
-      setCrowAssociationError('Network error while retrieving Crow information');
+    } catch (err: any) {
+      console.error('Error fetching Crow association:', err);
+      setError('Error fetching Crow information: ' + (err.message || 'Unknown error'));
       
       // Reset form values
       setValues(prev => ({
@@ -126,7 +146,7 @@ const Replace: React.FC = () => {
       
       setAvailableCrows([]);
     } finally {
-      setCrowAssociationLoading(false);
+      setCrowLookupLoading(false);
     }
   };
 
@@ -142,20 +162,25 @@ const Replace: React.FC = () => {
     setIsLoadingCrows(true);
     
     try {
-      const response = await fetch(`${nonDeployedCrowsUrl}?site_id=${site}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Device ${values.existing_crow_id}`
-        }
-      });
+      const token = await getAuthToken();
+      if (!token) return;
       
-      if (response.status === 200) {
-        const data = await response.json();
-        setAvailableCrows(data.crows || []);
+      // Get available crows at this site in 'received' status
+      const response = await getCrows(
+        {
+          status: 'received',
+          site_id: site
+        },
+        token
+      );
+      
+      if (response.success && response.data) {
+        const crowIds = response.data.crows.map((crow: Crow) => crow.crow_id);
+        setAvailableCrows(crowIds);
         
         // If there's exactly one available Crow, select it automatically
-        if (data.crows && data.crows.length === 1) {
-          handleChange('new_crow_id', data.crows[0]);
+        if (crowIds.length === 1) {
+          handleChange('new_crow_id', crowIds[0]);
         } else {
           handleChange('new_crow_id', '');
         }
@@ -163,8 +188,8 @@ const Replace: React.FC = () => {
         setAvailableCrows([]);
         handleChange('new_crow_id', '');
       }
-    } catch (error) {
-      console.error('Error fetching non-deployed Crows:', error);
+    } catch (err) {
+      console.error('Error fetching non-deployed Crows:', err);
       setAvailableCrows([]);
       handleChange('new_crow_id', '');
     } finally {
@@ -183,22 +208,45 @@ const Replace: React.FC = () => {
       return;
     }
     
-    // Create request headers
-    const headers = {
-      'Authorization': `Device ${values.existing_crow_id}`,
-      'step': 'replaced'
-    };
+    setIsLoading(true);
+    setError(null);
     
-    // Make the API request
-    await makeRequest(
-      { 
-        existing_crow_id: values.existing_crow_id,
-        new_crow_id: values.new_crow_id,
-        site_id: values.site_id,
-        work_cell_id: values.work_cell_id
-      },
-      headers
-    );
+    try {
+      const token = await getAuthToken();
+      if (!token) {
+        setError('Authentication required. Please log in again.');
+        navigate('/login', { state: { returnUrl: '/replace' } });
+        return;
+      }
+      
+      // Use the replaceCrow function from userApi
+      const response = await replaceCrow(
+        {
+          existing_crow_id: values.existing_crow_id.trim(),
+          new_crow_id: values.new_crow_id.trim(),
+          site_id: values.site_id.trim(),
+          work_cell_id: values.work_cell_id.trim()
+        },
+        token
+      );
+      
+      if (response.success) {
+        setSuccess(true);
+        setResponseData(response.data);
+      } else {
+        setError(response.message || 'An error occurred during the replacement process.');
+      }
+    } catch (err: any) {
+      console.error('Error during form submission:', err);
+      setError(err.message || 'An unexpected error occurred.');
+      
+      if (err.message?.includes('authentication')) {
+        // Handle authentication-specific errors
+        navigate('/login', { state: { returnUrl: '/replace', authError: err.message } });
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   /**
@@ -206,6 +254,7 @@ const Replace: React.FC = () => {
    */
   const handleReset = () => {
     setSuccess(false);
+    setResponseData(null);
     resetForm();
     setAvailableCrows([]);
   };
@@ -264,9 +313,9 @@ const Replace: React.FC = () => {
                     onChange={(e) => handleChange('existing_crow_id', e.target.value)}
                     className="w-full bg-slate-800/50 border border-cyan-900/50 rounded-md px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
                     placeholder="Enter existing Crow ID"
-                    disabled={isLoading || crowAssociationLoading}
+                    disabled={isLoading || crowLookupLoading}
                   />
-                  {crowAssociationLoading && (
+                  {crowLookupLoading && (
                     <div className="absolute inset-y-0 right-0 flex items-center pr-3">
                       <svg className="animate-spin h-5 w-5 text-cyan-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -278,9 +327,9 @@ const Replace: React.FC = () => {
                 <button
                   type="button"
                   onClick={fetchCrowAssociation}
-                  disabled={!values.existing_crow_id.trim() || isLoading || crowAssociationLoading}
+                  disabled={!values.existing_crow_id.trim() || isLoading || crowLookupLoading}
                   className={`px-4 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-opacity-50 
-                    ${(!values.existing_crow_id.trim() || isLoading || crowAssociationLoading)
+                    ${(!values.existing_crow_id.trim() || isLoading || crowLookupLoading)
                       ? 'bg-slate-700 text-gray-400 cursor-not-allowed' 
                       : 'bg-cyan-700 hover:bg-cyan-600 text-white'
                     }`}
@@ -291,49 +340,32 @@ const Replace: React.FC = () => {
               <p className="text-amber-200/80 text-sm mt-1">
                 This is the ID of the Crow currently protecting the work cell
               </p>
-              {crowAssociationError && <p className="text-red-400 text-sm mt-1">{crowAssociationError}</p>}
               {errors.existing_crow_id && <p className="text-red-400 text-sm mt-1">{errors.existing_crow_id}</p>}
             </div>
             
             {/* Site ID - Read only */}
-            <div>
-              <label htmlFor="site_id" className="block text-cyan-200 mb-2 font-medium">
-                Site ID
-              </label>
-              <input
-                type="text"
-                id="site_id"
-                value={values.site_id}
-                className="w-full bg-slate-800/50 border border-cyan-900/50 rounded-md px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
-                placeholder="Enter site ID"
-                disabled={true}
-                readOnly
-              />
-              <p className="text-cyan-200/70 text-sm mt-1">
-                Site ID is automatically retrieved from existing Crow association
-              </p>
-              {errors.site_id && <p className="text-red-400 text-sm mt-1">{errors.site_id}</p>}
-            </div>
+            <FormInput
+              id="site_id"
+              label="Site ID"
+              value={values.site_id || ''}
+              onChange={(value) => handleChange('site_id', value)}
+              placeholder="Site ID will be filled automatically"
+              disabled={true}
+              error={errors.site_id}
+              helpText="Site ID is automatically retrieved from existing Crow association"
+            />
             
             {/* Work Cell ID - Read only */}
-            <div>
-              <label htmlFor="work_cell_id" className="block text-cyan-200 mb-2 font-medium">
-                Work Cell ID
-              </label>
-              <input
-                type="text"
-                id="work_cell_id"
-                value={values.work_cell_id || ''}
-                className="w-full bg-slate-800/50 border border-cyan-900/50 rounded-md px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
-                placeholder="Enter work cell ID"
-                disabled={true}
-                readOnly
-              />
-              <p className="text-cyan-200/70 text-sm mt-1">
-                Work Cell ID is automatically retrieved from existing Crow association
-              </p>
-              {errors.work_cell_id && <p className="text-red-400 text-sm mt-1">{errors.work_cell_id}</p>}
-            </div>
+            <FormInput
+              id="work_cell_id"
+              label="Work Cell ID"
+              value={values.work_cell_id || ''}
+              onChange={(value) => handleChange('work_cell_id', value)}
+              placeholder="Work Cell ID will be filled automatically"
+              disabled={true}
+              error={errors.work_cell_id}
+              helpText="Work Cell ID is automatically retrieved from existing Crow association"
+            />
             
             {/* New Crow ID - Dynamic input/select */}
             <div>
@@ -397,27 +429,12 @@ const Replace: React.FC = () => {
             <ErrorMessage message={String(error || '')} />
             
             <div className="flex justify-center">
-              <button
-                type="submit"
-                disabled={isLoading}
-                className={`px-6 py-3 rounded-md text-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-opacity-50 
-                  ${isLoading 
-                    ? 'bg-cyan-900 cursor-not-allowed' 
-                    : 'bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600'
-                  }`}
-              >
-                {isLoading ? (
-                  <div className="flex items-center">
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Processing...
-                  </div>
-                ) : (
-                  'Replace Crow!'
-                )}
-              </button>
+              <SubmitButton
+                isLoading={isLoading}
+                text="Replace Crow!"
+                loadingText="Processing..."
+                disabled={!values.existing_crow_id || !values.new_crow_id || !values.site_id || !values.work_cell_id}
+              />
             </div>
           </form>
         )}
