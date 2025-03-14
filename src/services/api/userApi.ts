@@ -22,7 +22,8 @@ import type {
  * @returns Promise resolving to API response
  */
 export const provisionCrow = async (
-  data: ProvisionRequest
+  data: ProvisionRequest,
+  token: string
 ): Promise<ApiResponse> => {
   return makeApiRequest(
     ENDPOINTS.USERS,
@@ -30,9 +31,8 @@ export const provisionCrow = async (
       operation: OPERATIONS.USER.PROVISION,
       ...data
     },
-    'ApiKey', // Uses API key auth instead of token
-    undefined,
-    { 'step': 'provisioned' }
+    'Bearer',
+    token
   );
 };
 
@@ -53,8 +53,7 @@ export const receiveCrow = async (
       ...data
     },
     'Bearer',
-    token,
-    { 'step': 'received' }
+    token
   );
 };
 
@@ -75,8 +74,7 @@ export const deployCrow = async (
       ...data
     },
     'Bearer',
-    token,
-    { 'step': 'deployed' }
+    token
   );
 };
 
@@ -97,8 +95,7 @@ export const replaceCrow = async (
       ...data
     },
     'Bearer',
-    token,
-    { 'step': 'replaced' }
+    token
   );
 };
 
@@ -119,8 +116,7 @@ export const transferCrow = async (
       ...data
     },
     'Bearer',
-    token,
-    { 'step': 'transferred' }
+    token
   );
 };
 
@@ -133,8 +129,7 @@ export const transferCrow = async (
  */
 export const toggleCrowMonitoring = async (
   data: SuspendReactivateRequest,
-  token: string,
-  isReactivation: boolean = false
+  token: string
 ): Promise<ApiResponse> => {
   return makeApiRequest(
     ENDPOINTS.USERS,
@@ -143,8 +138,7 @@ export const toggleCrowMonitoring = async (
       ...data
     },
     'Bearer',
-    token,
-    { 'step': isReactivation ? 'reactivate' : 'suspend' }
+    token
   );
 };
 
@@ -165,7 +159,6 @@ export const retireCrow = async (
       ...data
     },
     'Bearer',
-    token,
-    { 'step': 'retired' }
+    token
   );
 };
