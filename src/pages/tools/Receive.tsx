@@ -25,8 +25,7 @@ const Receive: React.FC = () => {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useContext(AuthContext);
   
-  // Switch to useAuthenticatedRequest which handles tokens automatically
-  // Temporarily bypass group check while implementing usergroups worker
+  // Use the authenticated request hook with the main controller endpoint
   const { 
     makeRequest, 
     isLoading, 
@@ -35,7 +34,7 @@ const Receive: React.FC = () => {
     setSuccess,
     data
   } = useAuthenticatedRequest(
-    API_CONFIG.ENDPOINTS.RECEIVE,
+    API_CONFIG.ENDPOINTS.MANAGE_CROW_USERS,
     ['Operators', 'Administrators'],
     true // Bypass group check temporarily
   );
@@ -117,15 +116,17 @@ const Receive: React.FC = () => {
     try {
       // Format the request body to match the expected Lambda controller format
       const requestData = {
-        operation: 'receive', // Required by the controller Lambda
+        operation: API_CONFIG.OPERATIONS.RECEIVE, // Use the operation from API_CONFIG
         crow_id: values.crow_id?.toUpperCase().trim(),
         site_id: values.site_id?.toUpperCase().trim()
       };
       
       // Additional headers for the operation
       const additionalHeaders = {
-        'step': 'received'
+        
       };
+      
+      console.log('Sending request data:', requestData);
       
       // Make the API request
       await makeRequest(

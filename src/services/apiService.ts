@@ -5,18 +5,30 @@ export const API_CONFIG = {
   BASE_URL: import.meta.env.VITE_API_URL,
   PROVISION_KEY: import.meta.env.VITE_PROVISION_API_KEY,
   ENDPOINTS: {
-    PROVISION: '/provision',
-    RECEIVE: '/receive',
-    DEPLOY: '/deploy',
-    REPLACE: '/replace',
-    TRANSFER: '/transfer',
-    MONITOR_STATUS: '/monitor-status',
-    RETIRE: '/retire',
-    GET_CROWS: '/getcrows',
-    NON_DEPLOYED_CROWS: '/non-deployed-crows-at-site',
-    GET_CROW_MODELS: '/getcrowmodels',
-    GET_ACTIVE_OS_IMAGES: '/getactiveosimages',
-    USER_GROUPS: '/usergroups'  // New endpoint for user groups
+    // Main controller endpoints
+    MANAGE_CROW_USERS: '/manageCrowUsers',  // For user operations (receive, deploy, etc.)
+    MANAGE_CROW_FORMS: '/manageCrowForms',  // For form data operations
+    USER_GROUPS: '/usergroups'              // For user group operations
+  },
+  // Operations for each controller
+  OPERATIONS: {
+    // User operations
+    RECEIVE: 'receive',
+    DEPLOY: 'deploy',
+    REPLACE: 'replace',
+    TRANSFER: 'transfer',
+    SUSPEND_REACTIVATE: 'suspendreactivate',
+    RETIRE: 'retire',
+    
+    // Form data operations
+    GET_CROWS: 'crows',
+    GET_SITES: 'sites',
+    GET_WORK_CELLS: 'workcells',
+    GET_CROW_MODELS: 'crowmodels',
+    GET_OS_VERSIONS: 'osversions',  // Operation for OS versions worker
+    
+    // User group operations
+    GET_USER_GROUPS: 'usergroups'
   }
 };
 
@@ -64,15 +76,10 @@ export const buildApiUrl = (endpoint: string): string => {
  * Generate authorization header based on auth type and ID
  */
 export const getAuthHeader = (
-  authType: 'Crow' | 'Device' | 'Bearer' | 'ApiKey',
+  authType: 'Bearer' | 'ApiKey',
   id?: string
 ): Record<string, string> => {
   switch (authType) {
-    case 'Crow':
-    case 'Device':
-      // Legacy auth types - consider deprecating
-      console.warn(`Using deprecated auth type: ${authType}`);
-      return { 'Authorization': `${authType} ${id}` };
     case 'Bearer':
       return { 'Authorization': `Bearer ${id}` };
     case 'ApiKey':
@@ -80,30 +87,6 @@ export const getAuthHeader = (
     default:
       return {};
   }
-};
-
-/**
- * Determine the appropriate authentication headers based on endpoint
- */
-export const getAuthHeadersForEndpoint = (
-  endpoint: string, 
-  token?: string
-): Record<string, string> => {
-  // For provision endpoint, use API key authentication
-  if (endpoint === API_CONFIG.ENDPOINTS.PROVISION || 
-      endpoint === API_CONFIG.ENDPOINTS.GET_CROW_MODELS || 
-      endpoint === API_CONFIG.ENDPOINTS.GET_ACTIVE_OS_IMAGES) {
-    return getAuthHeader('ApiKey');
-  }
-  
-  // For all other endpoints, use Bearer token if provided
-  if (token) {
-    return getAuthHeader('Bearer', token);
-  }
-  
-  // If no token is provided for non-provision endpoints, return empty headers
-  console.warn('No authentication token provided for protected endpoint');
-  return {};
 };
 
 /**
@@ -120,8 +103,10 @@ export const makeApiRequest = async <T = any>(
     // Build the proper URL
     const url = buildApiUrl(endpoint);
     
-    // Get the appropriate auth headers for this endpoint
-    const authHeaders = getAuthHeadersForEndpoint(endpoint, token);
+    // Determine auth headers based on endpoint
+    const authHeaders = token 
+      ? getAuthHeader('Bearer', token)
+      : (endpoint.includes('provision') ? getAuthHeader('ApiKey') : {});
     
     // Combine all headers
     const headers = {
@@ -137,9 +122,22 @@ export const makeApiRequest = async <T = any>(
     };
     
     // Add body for non-GET requests
-    if (method !== 'GET') {
+    if (method !== 'GET' && Object.keys(data).length > 0) {
       fetchOptions.body = JSON.stringify(data);
     }
+    
+    // Log request details (with sensitive data redacted)
+    console.debug('API Request:', {
+      url,
+      method,
+      operation: data.operation,
+      // Exclude sensitive data from logging
+      headers: {
+        ...headers,
+        Authorization: headers.Authorization ? '[REDACTED]' : undefined,
+        'x-api-key': headers['x-api-key'] ? '[REDACTED]' : undefined
+      }
+    });
     
     // Make the request
     const response = await fetch(url, fetchOptions);
@@ -166,6 +164,8 @@ export const makeApiRequest = async <T = any>(
         ? responseData.message 
         : `Request failed with status: ${response.status}`;
       
+      console.error('API error response:', responseData);
+      
       return {
         success: false,
         message: errorMessage
@@ -184,25 +184,17 @@ export const makeApiRequest = async <T = any>(
  * Service functions for different API operations
  */
 
-// Provision a new Crow
-export const provisionCrow = async (
-  data: { serial_number: string; site_name: string }
-): Promise<ApiResponse> => {
-  return makeApiRequest(
-    API_CONFIG.ENDPOINTS.PROVISION,
-    data,
-    undefined  // No token needed for provision endpoint
-  );
-};
-
 // Receive a Crow at a site
 export const receiveCrow = async (
   data: CrowData,
   token: string
 ): Promise<ApiResponse> => {
   return makeApiRequest(
-    API_CONFIG.ENDPOINTS.RECEIVE,
-    data,
+    API_CONFIG.ENDPOINTS.MANAGE_CROW_USERS,
+    {
+      operation: API_CONFIG.OPERATIONS.RECEIVE,
+      ...data
+    },
     token,
     { 'step': 'received' }
   );
@@ -214,8 +206,11 @@ export const deployCrow = async (
   token: string
 ): Promise<ApiResponse> => {
   return makeApiRequest(
-    API_CONFIG.ENDPOINTS.DEPLOY,
-    data,
+    API_CONFIG.ENDPOINTS.MANAGE_CROW_USERS,
+    {
+      operation: API_CONFIG.OPERATIONS.DEPLOY,
+      ...data
+    },
     token,
     { 'step': 'deployed' }
   );
@@ -227,8 +222,11 @@ export const replaceCrow = async (
   token: string
 ): Promise<ApiResponse> => {
   return makeApiRequest(
-    API_CONFIG.ENDPOINTS.REPLACE,
-    data,
+    API_CONFIG.ENDPOINTS.MANAGE_CROW_USERS,
+    {
+      operation: API_CONFIG.OPERATIONS.REPLACE,
+      ...data
+    },
     token,
     { 'step': 'replaced' }
   );
@@ -240,22 +238,13 @@ export const transferCrow = async (
   token: string
 ): Promise<ApiResponse> => {
   return makeApiRequest(
-    API_CONFIG.ENDPOINTS.TRANSFER,
-    data,
+    API_CONFIG.ENDPOINTS.MANAGE_CROW_USERS,
+    {
+      operation: API_CONFIG.OPERATIONS.TRANSFER,
+      ...data
+    },
     token,
     { 'step': 'transferred' }
-  );
-};
-
-// Check the monitoring status of a Crow
-export const checkCrowStatus = async (
-  crowId: string,
-  token: string
-): Promise<ApiResponse> => {
-  return makeApiRequest(
-    API_CONFIG.ENDPOINTS.MONITOR_STATUS,
-    { crow_id: crowId },
-    token
   );
 };
 
@@ -265,8 +254,11 @@ export const retireCrow = async (
   token: string
 ): Promise<ApiResponse> => {
   return makeApiRequest(
-    API_CONFIG.ENDPOINTS.RETIRE,
-    data,
+    API_CONFIG.ENDPOINTS.MANAGE_CROW_USERS,
+    {
+      operation: API_CONFIG.OPERATIONS.RETIRE,
+      ...data
+    },
     token,
     { 'step': 'retired' }
   );
@@ -278,51 +270,48 @@ export const getCrowsForSite = async (
   token: string
 ): Promise<ApiResponse> => {
   return makeApiRequest(
-    API_CONFIG.ENDPOINTS.GET_CROWS,
-    { site_id: siteId },
+    API_CONFIG.ENDPOINTS.MANAGE_CROW_FORMS,
+    { 
+      operation: API_CONFIG.OPERATIONS.GET_CROWS,
+      site_id: siteId 
+    },
     token
   );
 };
 
-// Get non-deployed Crows at a site
-export const getNonDeployedCrowsAtSite = async (
-  siteId: string,
+// Get crow models
+export const getCrowModels = async (
   token: string
 ): Promise<ApiResponse> => {
   return makeApiRequest(
-    API_CONFIG.ENDPOINTS.NON_DEPLOYED_CROWS,
-    { site_id: siteId },
+    API_CONFIG.ENDPOINTS.MANAGE_CROW_FORMS,
+    { operation: API_CONFIG.OPERATIONS.GET_CROW_MODELS },
+    token
+  );
+};
+
+// Get user groups
+export const getUserGroups = async (
+  token: string
+): Promise<ApiResponse> => {
+  return makeApiRequest(
+    API_CONFIG.ENDPOINTS.USER_GROUPS,
+    { operation: API_CONFIG.OPERATIONS.GET_USER_GROUPS },
     token
   );
 };
 
 /**
- * Get all manufacturers or models for a specific manufacturer
- * @param manufacturer Manufacturer ID or "*" to get all manufacturers
- * @param models Model ID or "*" to get all models for a manufacturer
- */
-export const getCrowModels = async (
-  manufacturer: string = "*",
-  models: string = "*"
-): Promise<ApiResponse> => {
-  return makeApiRequest(
-    API_CONFIG.ENDPOINTS.GET_CROW_MODELS,
-    { manufacturer, models },
-    undefined,  // No token needed
-    {},  // No additional headers
-    'GET'  // GET method
-  );
-};
-
-/**
- * Get all active OS images
+ * Get active OS images (for Provision page)
+ * This operation doesn't require authentication, but still uses POST with operation in body
  */
 export const getActiveOsImages = async (): Promise<ApiResponse> => {
   return makeApiRequest(
-    API_CONFIG.ENDPOINTS.GET_ACTIVE_OS_IMAGES,
-    {},
-    undefined,  // No token needed
-    {},  // No additional headers
-    'GET'  // GET method
+    API_CONFIG.ENDPOINTS.MANAGE_CROW_FORMS,
+    { 
+      operation: API_CONFIG.OPERATIONS.GET_OS_VERSIONS
+    },
+    undefined, // No token needed
+    {} // No additional headers
   );
 };

@@ -3,8 +3,7 @@ import { AuthContext } from '../contexts/AuthContext';
 import { 
   ApiResponse, 
   makeApiRequest, 
-  API_CONFIG,
-  buildApiUrl
+  API_CONFIG
 } from '../services/apiService';
 
 /**
@@ -74,30 +73,22 @@ export const useAuthenticatedRequest = (
         return;
       }
       
-      // Build URL and make request
-      const apiUrl = buildApiUrl(API_CONFIG.ENDPOINTS.USER_GROUPS);
-      
       // Make API request to get groups
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ operation: 'usergroups' })
-      });
+      const result = await makeApiRequest(
+        API_CONFIG.ENDPOINTS.USER_GROUPS,
+        { operation: API_CONFIG.OPERATIONS.GET_USER_GROUPS },
+        token
+      );
       
-      if (!response.ok) {
-        throw new Error(`Error fetching user groups: ${response.statusText}`);
+      if (result.success && result.data) {
+        const groups = result.data.groups || [];
+        console.log('Fetched user groups:', groups);
+        
+        setUserGroups(groups);
+      } else {
+        console.error('Failed to fetch user groups:', result.message);
       }
       
-      const result = await response.json();
-      
-      // Get groups from response
-      const groups = result.groups || [];
-      console.log('Fetched user groups:', groups);
-      
-      setUserGroups(groups);
       setGroupsLoaded(true);
     } catch (error) {
       console.error('Error fetching user groups:', error);
@@ -186,32 +177,6 @@ export const useAuthenticatedRequest = (
     
   }, [isAuthenticated, user, requiredGroups, userGroups, groupsLoaded, fetchUserGroups, bypassGroupCheck]);
 
-  // When groups change, check authorization again
-  useEffect(() => {
-    // Skip if no groups required or bypassing check
-    if (!requiredGroups || requiredGroups.length === 0 || bypassGroupCheck) {
-      return;
-    }
-    
-    // Skip if not authenticated or groups not loaded yet
-    if (!isAuthenticated || !groupsLoaded) {
-      return;
-    }
-    
-    // Check if user has any of the required groups
-    const hasRequiredGroup = requiredGroups.some(group => 
-      userGroups.includes(group)
-    );
-    
-    console.log('Group authorization check:', {
-      userGroups,
-      requiredGroups,
-      hasRequiredGroup
-    });
-    
-    setIsAuthorized(hasRequiredGroup);
-  }, [userGroups, requiredGroups, isAuthenticated, groupsLoaded, bypassGroupCheck]);
-
   /**
    * Make an authenticated API request with automatic token handling
    * 
@@ -233,58 +198,28 @@ export const useAuthenticatedRequest = (
     try {
       let token: string | null = null;
       
-      // For non-provision endpoints, we need authentication
-      if (endpointPath !== API_CONFIG.ENDPOINTS.PROVISION &&
-          endpointPath !== API_CONFIG.ENDPOINTS.GET_CROW_MODELS &&
-          endpointPath !== API_CONFIG.ENDPOINTS.GET_ACTIVE_OS_IMAGES) {
-        
-        // Check if user is authenticated
-        if (!isAuthenticated) {
-          throw new Error('User is not authenticated');
-        }
-        
-        // Check if user is authorized (if requiredGroups specified)
-        if (!bypassGroupCheck && requiredGroups && requiredGroups.length > 0 && isAuthorized === false) {
-          throw new Error(`User does not have required permissions: ${requiredGroups.join(', ')}`);
-        }
-        
-        // Get the Cognito token
-        token = await getAuthToken();
-        
-        if (!token) {
-          throw new Error('Failed to get authentication token');
-        }
-      }
-
-      // Ensure operation field is present in request data
-      // This is required by the controller Lambda
-      if (!requestData.operation && endpointPath) {
-        // Extract operation from endpoint path
-        const pathParts = endpointPath.split('/');
-        const lastPart = pathParts[pathParts.length - 1];
-        requestData.operation = lastPart.toLowerCase();
+      // Check if user is authenticated for protected endpoints
+      if (!isAuthenticated) {
+        throw new Error('User is not authenticated');
       }
       
-      // Build the full API URL
-      const apiUrl = buildApiUrl(endpointPath);
+      // Check if user is authorized (if requiredGroups specified)
+      if (!bypassGroupCheck && requiredGroups && requiredGroups.length > 0 && isAuthorized === false) {
+        throw new Error(`User does not have required permissions: ${requiredGroups.join(', ')}`);
+      }
       
-      // Log request (with sensitive data redacted)
-      console.debug('API Request:', {
-        url: apiUrl,
-        method,
-        operation: requestData.operation,
-        // Exclude sensitive data from logging
-        headers: {
-          ...additionalHeaders,
-          Authorization: token ? '[REDACTED]' : undefined,
-        }
-      });
+      // Get the Cognito token
+      token = await getAuthToken();
+      
+      if (!token) {
+        throw new Error('Failed to get authentication token');
+      }
       
       // Make the request with the appropriate authentication
       const result = await makeApiRequest<T>(
         endpointPath,
         requestData,
-        token || undefined,
+        token,
         additionalHeaders,
         method
       );
