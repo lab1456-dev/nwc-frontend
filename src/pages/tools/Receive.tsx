@@ -1,9 +1,7 @@
-import React, { useContext, useEffect } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import WorkflowStepDescriptions from '../../data/WorkflowStepDescriptions';
 import { useCrowForm } from '../../hooks/useCrowForm';
-import { useAuthenticatedRequest } from '../../hooks/useAuthenticatedRequest';
-import { API_CONFIG } from '../../services/apiService';
 import { AuthContext } from '../../contexts/AuthContext';
 import { 
   PageContainer, 
@@ -18,26 +16,25 @@ import {
 } from '../../components/formComponents';
 import { CrowFormData } from '../../types/types';
 
+// Import from the new API service
+import { receiveCrow } from '../../services/api/userApi';
+import { getSites } from '../../services/api/formApi';
+import { Site } from '../../services/api/apiTypes';
+
 /**
  * Receive component - Handles registering a Crow at a specific site
  */
 const Receive: React.FC = () => {
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useContext(AuthContext);
+  const { isAuthenticated, getAuthToken } = useContext(AuthContext);
   
-  // Use the authenticated request hook with the main controller endpoint
-  const { 
-    makeRequest, 
-    isLoading, 
-    error, 
-    success, 
-    setSuccess,
-    data
-  } = useAuthenticatedRequest(
-    API_CONFIG.ENDPOINTS.MANAGE_CROW_USERS,
-    ['Operators', 'Administrators'],
-    true // Bypass group check temporarily
-  );
+  // State for API communication
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [responseData, setResponseData] = useState<any>(null);
+  const [sites, setSites] = useState<Site[]>([]);
+  const [sitesLoading, setSitesLoading] = useState(false);
   
   // Check for authentication
   useEffect(() => {
@@ -46,11 +43,27 @@ const Receive: React.FC = () => {
       navigate('/login', { state: { returnUrl: '/receive' } });
       return;
     }
-
-    // Temporary debugging to see user object
-    console.log('User object in Receive:', user);
     
-  }, [isAuthenticated, user, navigate]);
+    // Load sites for dropdown (optional enhancement)
+    const loadSites = async () => {
+      try {
+        setSitesLoading(true);
+        const token = await getAuthToken();
+        if (!token) return;
+        
+        const response = await getSites({ site_id: '*' }, token);
+        if (response.success && response.data) {
+          setSites(response.data.sites || []);
+        }
+      } catch (err) {
+        console.error('Error loading sites:', err);
+      } finally {
+        setSitesLoading(false);
+      }
+    };
+    
+    loadSites();
+  }, [isAuthenticated, getAuthToken, navigate]);
   
   // Initialize the form hook with validation rules
   const { 
@@ -113,33 +126,42 @@ const Receive: React.FC = () => {
       return;
     }
     
+    setIsLoading(true);
+    setError(null);
+    
     try {
-      // Format the request body to match the expected Lambda controller format
-      const requestData = {
-        operation: API_CONFIG.OPERATIONS.RECEIVE, // Use the operation from API_CONFIG
-        crow_id: values.crow_id?.toUpperCase().trim(),
-        site_id: values.site_id?.toUpperCase().trim()
-      };
+      const token = await getAuthToken();
+      if (!token) {
+        setError('Authentication required. Please log in again.');
+        navigate('/login', { state: { returnUrl: '/receive' } });
+        return;
+      }
       
-      // Additional headers for the operation
-      const additionalHeaders = {
-        
-      };
-      
-      console.log('Sending request data:', requestData);
-      
-      // Make the API request
-      await makeRequest(
-        requestData,
-        additionalHeaders
+      // Use the new receiveCrow function from userApi
+      const response = await receiveCrow(
+        {
+          crow_id: values.crow_id?.toUpperCase().trim() || '',
+          site_id: values.site_id?.toUpperCase().trim() || ''
+        },
+        token
       );
+      
+      if (response.success) {
+        setSuccess(true);
+        setResponseData(response.data);
+      } else {
+        setError(response.message || 'An error occurred during the receiving process.');
+      }
     } catch (err: any) {
       console.error('Error during form submission:', err);
+      setError(err.message || 'An unexpected error occurred.');
       
       if (err.message?.includes('authentication')) {
         // Handle authentication-specific errors
         navigate('/login', { state: { returnUrl: '/receive', authError: err.message } });
       }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -148,6 +170,7 @@ const Receive: React.FC = () => {
    */
   const handleReset = () => {
     setSuccess(false);
+    setResponseData(null);
     resetForm();
   };
 
@@ -162,7 +185,7 @@ const Receive: React.FC = () => {
         {success ? (
           <SuccessMessage
             title="Crow successfully received!"
-            message={data?.message || `Crow ${values.crow_id} has been received at site ${values.site_id}.`}
+            message={responseData?.message || `Crow ${values.crow_id} has been received at site ${values.site_id}.`}
             buttonText="Receive Another Crow"
             onButtonClick={handleReset}
           />
@@ -179,16 +202,52 @@ const Receive: React.FC = () => {
               helpText="ID will be converted to uppercase automatically"
             />
             
-            <FormInput
-              id="site_id"
-              label="Site ID"
-              value={values.site_id || ''}
-              onChange={(value) => handleChange('site_id', value)}
-              placeholder="Enter site ID"
-              disabled={isLoading}
-              error={errors.site_id}
-              helpText="ID will be converted to uppercase automatically"
-            />
+            {/* Optional enhancement: Use a select dropdown if sites are loaded */}
+            {sites.length > 0 ? (
+              <div>
+                <label htmlFor="site_id" className="block text-cyan-200 mb-2 font-medium">
+                  Site
+                </label>
+                <select
+                  id="site_id"
+                  value={values.site_id || ''}
+                  onChange={(e) => handleChange('site_id', e.target.value)}
+                  className="w-full bg-slate-800/50 border border-cyan-900/50 rounded-md px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+                  disabled={isLoading || sitesLoading}
+                >
+                  <option value="">Select a site</option>
+                  {sites.map((site) => (
+                    <option key={site.site_id} value={site.site_id}>
+                      {site.site_name} ({site.site_id})
+                    </option>
+                  ))}
+                  <option value="custom">Enter Custom Site ID...</option>
+                </select>
+                {values.site_id === 'custom' && (
+                  <FormInput
+                    id="custom_site_id"
+                    label="Custom Site ID"
+                    value={values.site_id === 'custom' ? '' : values.site_id || ''}
+                    onChange={(value) => handleChange('site_id', value)}
+                    placeholder="Enter site ID"
+                    disabled={isLoading}
+                    error={errors.site_id}
+                  />
+                )}
+                {errors.site_id && <p className="text-red-400 text-sm mt-1">{errors.site_id}</p>}
+              </div>
+            ) : (
+              <FormInput
+                id="site_id"
+                label="Site ID"
+                value={values.site_id || ''}
+                onChange={(value) => handleChange('site_id', value)}
+                placeholder="Enter site ID"
+                disabled={isLoading}
+                error={errors.site_id}
+                helpText="ID will be converted to uppercase automatically"
+              />
+            )}
             
             <ErrorMessage message={String(error || '')} />
             
