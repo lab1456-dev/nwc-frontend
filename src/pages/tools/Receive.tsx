@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import WorkflowStepDescriptions from '../../data/WorkflowStepDescriptions';
 import { useCrowForm } from '../../hooks/useCrowForm';
@@ -24,9 +24,9 @@ import { CrowFormData } from '../../types/types';
 const Receive: React.FC = () => {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useContext(AuthContext);
-  const [isAuthorized, setIsAuthorized] = useState<boolean>(false);
   
   // Switch to useAuthenticatedRequest which handles tokens automatically
+  // Temporarily bypass group check while implementing usergroups worker
   const { 
     makeRequest, 
     isLoading, 
@@ -34,9 +34,13 @@ const Receive: React.FC = () => {
     success, 
     setSuccess,
     data
-  } = useAuthenticatedRequest(API_CONFIG.ENDPOINTS.RECEIVE);
+  } = useAuthenticatedRequest(
+    API_CONFIG.ENDPOINTS.RECEIVE,
+    ['Operators', 'Administrators'],
+    true // Bypass group check temporarily
+  );
   
-  // Check for authentication and group membership
+  // Check for authentication
   useEffect(() => {
     if (!isAuthenticated) {
       // Redirect to login if not authenticated
@@ -44,31 +48,9 @@ const Receive: React.FC = () => {
       return;
     }
 
-    // Check for required group membership (Operators or Administrators)
-    const userGroups = user?.['cognito:groups'] || [];
-    const requiredGroups = ['Operators', 'Administrators'];
+    // Temporary debugging to see user object
+    console.log('User object in Receive:', user);
     
-    // Convert to array if it's a string (comma-separated)
-    const groupsArray = typeof userGroups === 'string' 
-      ? userGroups.split(',').map(g => g.trim())
-      : userGroups;
-    
-    // Check if user has any of the required groups
-    const hasRequiredGroup = requiredGroups.some(group => 
-      groupsArray.includes(group)
-    );
-    
-    setIsAuthorized(hasRequiredGroup);
-    
-    // Redirect to unauthorized page if not in required groups
-    if (!hasRequiredGroup) {
-      navigate('/unauthorized', { 
-        state: { 
-          requiredGroups: requiredGroups,
-          currentGroups: groupsArray 
-        } 
-      });
-    }
   }, [isAuthenticated, user, navigate]);
   
   // Initialize the form hook with validation rules
@@ -86,23 +68,40 @@ const Receive: React.FC = () => {
     {
       crow_id: { 
         required: true, 
-        message: 'Crow ID is required',
-        // Additional validation to match expected format
-        validate: (value) => {
-          if (value.length < 2) return 'Crow ID must be at least 2 characters';
-          return '';
-        }
+        message: 'Crow ID is required'
       },
       site_id: { 
         required: true, 
-        message: 'Site ID is required',
-        validate: (value) => {
-          if (value.length < 2) return 'Site ID must be at least 2 characters';
-          return '';
-        }
+        message: 'Site ID is required'
       }
     }
   );
+
+  /**
+   * Custom validation for form values
+   */
+  const customValidate = () => {
+    const newErrors: Record<string, string> = {};
+    
+    if (values.crow_id && values.crow_id.length < 2) {
+      newErrors.crow_id = 'Crow ID must be at least 2 characters';
+    }
+    
+    if (values.site_id && values.site_id.length < 2) {
+      newErrors.site_id = 'Site ID must be at least 2 characters';
+    }
+    
+    // If there are errors, return false
+    if (Object.keys(newErrors).length > 0) {
+      // Update form errors
+      Object.keys(newErrors).forEach(key => {
+        handleChange(key as keyof CrowFormData, values[key as keyof CrowFormData] || '');
+      });
+      return false;
+    }
+    
+    return true;
+  };
 
   /**
    * Handle form submission
@@ -110,8 +109,8 @@ const Receive: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
-    // Validate form before submission
-    if (!validateForm()) {
+    // Perform both custom validation and form validation
+    if (!customValidate() || !validateForm()) {
       return;
     }
     
@@ -150,23 +149,6 @@ const Receive: React.FC = () => {
     setSuccess(false);
     resetForm();
   };
-
-  // Display loading state while checking authorization
-  if (!isAuthenticated || isAuthorized === undefined) {
-    return (
-      <PageContainer>
-        <PageHeader
-          title="Checking Permissions"
-          subtitle="Please wait while we verify your access..."
-        />
-        <ContentCard>
-          <div className="flex justify-center py-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyan-500"></div>
-          </div>
-        </ContentCard>
-      </PageContainer>
-    );
-  }
 
   return (
     <PageContainer>
