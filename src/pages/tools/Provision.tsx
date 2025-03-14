@@ -1,8 +1,8 @@
-import React, { useState, ChangeEvent, useEffect } from 'react';
+import React, { useState, ChangeEvent, useEffect, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import WorkflowStepDescriptions from '../../data/WorkflowStepDescriptions';
 import { useCrowForm } from '../../hooks/useCrowForm';
-import { useApiRequest } from '../../hooks/useApiRequest';
-import { API_CONFIG, buildApiUrl, getCrowModels, getActiveOsImages } from '../../services/apiService';
+import { AuthContext } from '../../contexts/AuthContext';
 import { 
   PageContainer, 
   PageHeader, 
@@ -15,6 +15,26 @@ import {
   ErrorMessage 
 } from '../../components/formComponents';
 import { CrowFormData } from '../../types/types';
+
+// Import from the new API service structure
+import { provisionCrow } from '../../services/api/userApi';
+import { getCrowModels, getOsVersions } from '../../services/api/formApi';
+import type { OsVersion } from '../../services/api/apiTypes';
+
+/**
+ * Interface for manufacturer with models
+ */
+interface ManufacturerWithModels {
+  manufacturer_id: string;
+  manufacturer_name: string;
+  models: Array<{
+    model_id: string;
+    model_name: string;
+    cpu?: string;
+    ram?: string;
+    storage?: string;
+  }>;
+}
 
 /**
  * Extended CrowFormData interface with additional hardware fields
@@ -30,37 +50,7 @@ interface ExtendedCrowFormData extends Partial<CrowFormData> {
 }
 
 /**
- * Interface for manufacturer data
- */
-interface Manufacturer {
-  id: string;
-  name: string;
-  models: Model[];
-}
-
-/**
- * Interface for model data
- */
-interface Model {
-  id: string;
-  name: string;
-  specs: {
-    cpu: string;
-    ram: string;
-    storage: string;
-  };
-}
-
-/**
- * Interface for OS image data
- */
-interface OsImage {
-  id: string;
-  name: string;
-}
-
-/**
- * Interface for select option
+ * Select option interface for dropdowns
  */
 interface SelectOption {
   value: string;
@@ -77,48 +67,23 @@ type ProvisionMode = 'single' | 'multiple';
  * Supports both single and batch provisioning
  */
 const Provision: React.FC = () => {
+  const navigate = useNavigate();
+  const { isAuthenticated, getAuthToken } = useContext(AuthContext);
+  
   // State for toggling between single and multiple provision modes
   const [mode, setMode] = useState<ProvisionMode>('single');
   
+  // State for API communication
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  
   // State for dropdowns
-  const [manufacturers, setManufacturers] = useState<Manufacturer[]>([]);
-  const [osImages, setOsImages] = useState<OsImage[]>([]);
+  const [manufacturers, setManufacturers] = useState<ManufacturerWithModels[]>([]);
+  const [osImages, setOsImages] = useState<OsVersion[]>([]);
   const [loading, setLoading] = useState({
     manufacturers: false,
     osImages: false
-  });
-  
-  // API setup
-  const apiUrl = buildApiUrl(API_CONFIG.ENDPOINTS.PROVISION);
-  
-  const { 
-    makeRequest, 
-    isLoading, 
-    error, 
-    success, 
-    setSuccess 
-  } = useApiRequest(apiUrl);
-  
-  // Initial form values
-  const initialFormValues: ExtendedCrowFormData = {
-    crow_id: '',
-    manufacturer: '',
-    model: '',
-    cpu: '',
-    ram: '',
-    storage: '',
-    os_image_version: '',
-    site_id: '',
-    csvFile: null
-  };
-  
-  // Form validation rules based on mode
-  const getValidationRules = (currentMode: ProvisionMode) => ({
-    crow_id: { required: currentMode === 'single', message: 'Crow ID is required' },
-    manufacturer: { required: currentMode === 'single', message: 'Manufacturer is required' },
-    model: { required: currentMode === 'single', message: 'Model is required' },
-    os_image_version: { required: currentMode === 'single', message: 'OS Image Version is required' },
-    csvFile: { required: currentMode === 'multiple', message: 'CSV file is required' }
   });
   
   // Initialize the form hook with validation rules
@@ -130,9 +95,45 @@ const Provision: React.FC = () => {
     resetForm,
     setValues
   } = useCrowForm<ExtendedCrowFormData>(
-    initialFormValues,
+    {
+      crow_id: '',
+      manufacturer: '',
+      model: '',
+      cpu: '',
+      ram: '',
+      storage: '',
+      os_image_version: '',
+      site_id: '',
+      csvFile: null
+    },
     getValidationRules(mode)
   );
+
+  /**
+   * Get validation rules based on mode
+   */
+  function getValidationRules(currentMode: ProvisionMode) {
+    return {
+      crow_id: { required: currentMode === 'single', message: 'Crow ID is required' },
+      manufacturer: { required: currentMode === 'single', message: 'Manufacturer is required' },
+      model: { required: currentMode === 'single', message: 'Model is required' },
+      os_image_version: { required: currentMode === 'single', message: 'OS Image Version is required' },
+      csvFile: { required: currentMode === 'multiple', message: 'CSV file is required' }
+    };
+  }
+
+  /**
+   * Check for authentication and load initial data on component mount
+   */
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/signin', { state: { returnUrl: '/provision' } });
+      return;
+    }
+    
+    fetchManufacturers();
+    fetchOsImages();
+  }, [isAuthenticated, navigate]);
 
   /**
    * Fetch manufacturers and models data
@@ -141,15 +142,26 @@ const Provision: React.FC = () => {
     try {
       setLoading(prev => ({ ...prev, manufacturers: true }));
       
-      const response = await getCrowModels("*");
+      // Get auth token if available (optional for this endpoint)
+      const token = await getAuthToken();
+      
+      const response = await getCrowModels('*', undefined, token || undefined);
       
       if (response.success && response.data) {
-        setManufacturers(response.data);
+        // Transform the data to match ManufacturerWithModels structure
+        const transformedData: ManufacturerWithModels[] = response.data.map((item: any) => ({
+          manufacturer_id: item.manufacturer_id,
+          manufacturer_name: item.manufacturer_name,
+          models: Array.isArray(item.models) ? item.models : []
+        }));
+        
+        setManufacturers(transformedData);
       } else {
         throw new Error(response.message || 'Failed to fetch manufacturers');
       }
     } catch (error) {
       console.error('Error fetching manufacturers:', error);
+      setError('Failed to load manufacturers. Please try again.');
     } finally {
       setLoading(prev => ({ ...prev, manufacturers: false }));
     }
@@ -162,7 +174,7 @@ const Provision: React.FC = () => {
     try {
       setLoading(prev => ({ ...prev, osImages: true }));
       
-      const response = await getActiveOsImages();
+      const response = await getOsVersions();
       
       if (response.success && response.data) {
         setOsImages(response.data);
@@ -171,46 +183,40 @@ const Provision: React.FC = () => {
       }
     } catch (error) {
       console.error('Error fetching OS images:', error);
+      setError('Failed to load OS image versions. Please try again.');
     } finally {
       setLoading(prev => ({ ...prev, osImages: false }));
     }
   };
 
   /**
-   * Load data when component mounts
-   */
-  useEffect(() => {
-    fetchManufacturers();
-    fetchOsImages();
-  }, []);
-
-  /**
    * Update model specs when model changes
    */
   useEffect(() => {
     if (values.manufacturer && values.model) {
-      const selectedManufacturer = manufacturers.find(m => m.id === values.manufacturer);
+      const selectedManufacturer = manufacturers.find(m => m.manufacturer_id === values.manufacturer);
       if (selectedManufacturer) {
-        const selectedModel = selectedManufacturer.models.find(m => m.id === values.model);
+        // Find the model in the models array
+        const selectedModel = selectedManufacturer.models?.find((m: { model_id: string }) => m.model_id === values.model);
         if (selectedModel) {
           setValues(prev => ({
             ...prev,
-            cpu: selectedModel.specs.cpu,
-            ram: selectedModel.specs.ram,
-            storage: selectedModel.specs.storage
+            cpu: selectedModel.cpu || '',
+            ram: selectedModel.ram || '',
+            storage: selectedModel.storage || ''
           }));
         }
       }
     }
-  }, [values.manufacturer, values.model, manufacturers]);
+  }, [values.manufacturer, values.model, manufacturers, setValues]);
 
   /**
    * Convert manufacturers to select options
    */
   const getManufacturerOptions = (): SelectOption[] => {
     return manufacturers.map(manufacturer => ({
-      value: manufacturer.id,
-      label: manufacturer.name
+      value: manufacturer.manufacturer_id,
+      label: manufacturer.manufacturer_name
     }));
   };
 
@@ -220,12 +226,12 @@ const Provision: React.FC = () => {
   const getModelOptions = (): SelectOption[] => {
     if (!values.manufacturer) return [];
     
-    const selectedManufacturer = manufacturers.find(m => m.id === values.manufacturer);
-    if (!selectedManufacturer) return [];
+    const selectedManufacturer = manufacturers.find(m => m.manufacturer_id === values.manufacturer);
+    if (!selectedManufacturer || !selectedManufacturer.models) return [];
     
-    return selectedManufacturer.models.map(model => ({
-      value: model.id,
-      label: model.name
+    return selectedManufacturer.models.map((model: { model_id: string; model_name: string }) => ({
+      value: model.model_id,
+      label: model.model_name
     }));
   };
   
@@ -236,16 +242,23 @@ const Provision: React.FC = () => {
     if (!manufacturerId) return;
     
     try {
-      const response = await getCrowModels(manufacturerId, "*");
+      const token = await getAuthToken();
+      const response = await getCrowModels(manufacturerId, "*", token || undefined);
       
-      if (response.success && response.data) {
+      if (response.success && response.data && response.data.length > 0) {
         // Update just the models for this manufacturer in the manufacturers array
         setManufacturers(prev => {
           const updated = [...prev];
-          const index = updated.findIndex(m => m.id === manufacturerId);
+          const index = updated.findIndex(m => m.manufacturer_id === manufacturerId);
           
-          if (index !== -1 && response.data[0]) {
-            updated[index] = response.data[0];
+          if (index !== -1 && response.data && response.data[0]) {
+            // Transform to ManufacturerWithModels using a type assertion first
+            const item = response.data[0] as any;
+            updated[index] = {
+              manufacturer_id: item.manufacturer_id,
+              manufacturer_name: item.manufacturer_name,
+              models: Array.isArray(item.models) ? item.models : []
+            };
           }
           
           return updated;
@@ -301,34 +314,6 @@ const Provision: React.FC = () => {
   };
 
   /**
-   * Get request headers for API call
-   */
-  const getRequestHeaders = () => ({
-    'x-api-key': API_CONFIG.PROVISION_KEY,
-    'step': 'provisioned',
-    'mode': mode
-  });
-
-  /**
-   * Prepare request payload based on mode
-   */
-  const prepareRequestPayload = () => {
-    if (mode === 'single') {
-      return { 
-        crow_id: values.crow_id || '',
-        manufacturer: values.manufacturer || '',
-        model: values.model || '',
-        os_image_version: values.os_image_version || ''
-      };
-    } else if (values.csvFile) {
-      const formData = new FormData();
-      formData.append('csvFile', values.csvFile);
-      return formData;
-    }
-    return null;
-  };
-
-  /**
    * Handle form submission
    */
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -339,13 +324,45 @@ const Provision: React.FC = () => {
       return;
     }
     
-    const headers = getRequestHeaders();
-    const payload = prepareRequestPayload();
+    setIsLoading(true);
+    setError(null);
     
-    if (payload) {
-      // Use POST method for FormData when in multiple mode
-      const method = mode === 'multiple' ? 'POST' : undefined;
-      await makeRequest(payload, headers, method);
+    try {
+      if (mode === 'single') {
+        // Make sure all required values are present
+        if (!values.crow_id || !values.manufacturer || !values.model || !values.os_image_version) {
+          setError('All fields are required');
+          setIsLoading(false);
+          return;
+        }
+        
+        // Use the provisionCrow function from userApi
+        const response = await provisionCrow({
+          crow_id: values.crow_id || '',
+          manufacturer: values.manufacturer || '',
+          model: values.model || '',
+          os_image_version: values.os_image_version || ''
+        });
+        
+        if (response.success) {
+          setSuccess(true);
+        } else {
+          setError(response.message || 'An error occurred during provisioning');
+        }
+      } else if (values.csvFile) {
+        // For multiple mode with CSV, we need to use FormData
+        const formData = new FormData();
+        formData.append('csvFile', values.csvFile);
+        
+        // Special handling for FormData, would need additional implementation
+        // This would require a different API function that supports FormData
+        setError('Batch provisioning with CSV is not yet implemented in the API service');
+      }
+    } catch (error: any) {
+      console.error('Error during provisioning:', error);
+      setError(error.message || 'An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
     }
   };
 
