@@ -1,84 +1,133 @@
-import { useState } from 'react';
+// Enhanced version of the useCrowForm hook that handles dynamic validation rules
+import { useState, useEffect } from 'react';
 
-/**
- * Types for form field validation
- */
-interface FieldValidation {
+interface ValidationRule {
   required?: boolean;
   message?: string;
-  validate?: (value: string) => string;  // Add this line
+  pattern?: RegExp;
+  min?: number;
+  max?: number;
+  custom?: (value: any) => boolean;
 }
 
-interface FieldValidations {
-  [key: string]: FieldValidation;
-}
+type ValidationRules<T> = {
+  [K in keyof T]?: ValidationRule;
+};
 
-/**
- * Custom hook for managing form state and validation
- * 
- * @param initialValues - Initial form field values
- * @param validations - Validation rules for form fields
- */
-export const useCrowForm = <T extends Record<string, any>>(
+export function useCrowForm<T extends Record<string, any>>(
   initialValues: T,
-  validations: FieldValidations = {}
-) => {
+  validationRules: ValidationRules<T>
+) {
   const [values, setValues] = useState<T>(initialValues);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Partial<Record<keyof T, string>>>({});
+  const [rules, setRules] = useState<ValidationRules<T>>(validationRules);
+  
+  // Update validation rules when they change externally
+  useEffect(() => {
+    setRules(validationRules);
+  }, [validationRules]);
 
-  /**
-   * Update a form field value
-   * 
-   * @param field - The field name to update
-   * @param value - The new value
-   */
+  // Handle field change
   const handleChange = (field: keyof T, value: any) => {
     setValues(prev => ({ ...prev, [field]: value }));
     
-    // Clear error when field is updated
-    if (errors[field as string]) {
+    // Clear error when field is modified
+    if (errors[field]) {
       setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[field as string];
-        return newErrors;
+        const updated = { ...prev };
+        delete updated[field];
+        return updated;
       });
     }
   };
 
-  /**
-   * Reset the form to initial values
-   */
-  const resetForm = () => {
-    setValues(initialValues);
-    setErrors({});
+  // Validate a single field
+  const validateField = (field: keyof T): boolean => {
+    const value = values[field];
+    const rule = rules[field];
+    
+    if (!rule) return true;
+    
+    // Check required
+    if (rule.required && (value === undefined || value === null || value === '')) {
+      setErrors(prev => ({ ...prev, [field]: rule.message || 'This field is required' }));
+      return false;
+    }
+    
+    // Check pattern
+    if (rule.pattern && value && !rule.pattern.test(value)) {
+      setErrors(prev => ({ ...prev, [field]: rule.message || 'Invalid format' }));
+      return false;
+    }
+    
+    // Check min/max for numbers
+    if (typeof value === 'number') {
+      if (rule.min !== undefined && value < rule.min) {
+        setErrors(prev => ({ ...prev, [field]: rule.message || `Minimum value is ${rule.min}` }));
+        return false;
+      }
+      
+      if (rule.max !== undefined && value > rule.max) {
+        setErrors(prev => ({ ...prev, [field]: rule.message || `Maximum value is ${rule.max}` }));
+        return false;
+      }
+    }
+    
+    // Check min/max for strings
+    if (typeof value === 'string') {
+      if (rule.min !== undefined && value.length < rule.min) {
+        setErrors(prev => ({ ...prev, [field]: rule.message || `Minimum length is ${rule.min}` }));
+        return false;
+      }
+      
+      if (rule.max !== undefined && value.length > rule.max) {
+        setErrors(prev => ({ ...prev, [field]: rule.message || `Maximum length is ${rule.max}` }));
+        return false;
+      }
+    }
+    
+    // Custom validation
+    if (rule.custom && !rule.custom(value)) {
+      setErrors(prev => ({ ...prev, [field]: rule.message || 'Invalid value' }));
+      return false;
+    }
+    
+    return true;
   };
 
-  /**
-   * Validate all form fields
-   * 
-   * @returns true if valid, false if invalid
-   */
+  // Validate all fields
   const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
+    let isValid = true;
+    const newErrors: Partial<Record<keyof T, string>> = {};
     
-    // Check required fields
-    Object.entries(validations).forEach(([field, validation]) => {
-      if (validation.required && !values[field as keyof T]) {
-        newErrors[field] = validation.message || `${field} is required`;
+    // Check each field with rules
+    Object.keys(rules).forEach(key => {
+      const field = key as keyof T;
+      if (!validateField(field)) {
+        isValid = false;
+        // Preserve error message from validateField
+        newErrors[field] = errors[field];
       }
     });
     
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return isValid;
+  };
+
+  // Reset form to initial values
+  const resetForm = () => {
+    setValues(initialValues);
+    setErrors({});
   };
 
   return {
     values,
     errors,
     handleChange,
-    resetForm,
+    validateField,
     validateForm,
+    resetForm,
     setValues,
-    setErrors
+    setRules
   };
-};
+}

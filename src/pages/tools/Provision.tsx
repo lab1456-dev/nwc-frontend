@@ -1,4 +1,4 @@
-import React, { useState, ChangeEvent, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import WorkflowStepDescriptions from '../../data/WorkflowStepDescriptions';
 import { useCrowForm } from '../../hooks/useCrowForm';
@@ -14,38 +14,41 @@ import {
   SubmitButton, 
   ErrorMessage 
 } from '../../components/formComponents';
-import { CrowFormData } from '../../types/types';
 
-// Import from the new API service structure
-import { provisionCrow } from '../../services/api/userApi';
-import { getCrowModels, getOsVersions } from '../../services/api/formApi';
-import type { OsVersion } from '../../services/api/apiTypes';
+// Import from the API service specifications
+import { ProvisionApi } from '../../services/api/crow-management-api';
+import { CrowModelsFormApi, OSVersionsFormApi } from '../../services/api/crow-form-apis';
+import { callCrowApi, API_CONFIG } from '../../services/api/crow-management-api';
+import { callFormApi } from '../../services/api/crow-form-apis';
 
 /**
  * Interface for manufacturer with models
  */
 interface ManufacturerWithModels {
-  manufacturer_id: string;
-  manufacturer_name: string;
+  manufacturer: string;
+  manufacturer_name?: string;
   models: Array<{
-    model_id: string;
-    model_name: string;
-    cpu?: string;
-    ram?: string;
-    storage?: string;
+    model: string;
+    model_name?: string;
+    specs?: {
+      cpu?: string;
+      ram?: string;
+      storage?: string;
+    };
   }>;
 }
 
 /**
- * Extended CrowFormData interface with additional hardware fields
+ * Extended provision form data
  */
-interface ExtendedCrowFormData extends Partial<CrowFormData> {
+interface ProvisionFormData {
+  crow_id: string;
   manufacturer: string;
   model: string;
   cpu: string;
   ram: string;
   storage: string;
-  os_image_version: string;
+  firmware_version: string;
   csvFile?: File | null;
 }
 
@@ -64,7 +67,6 @@ type ProvisionMode = 'single' | 'multiple';
 
 /**
  * Provision component - Handles registering Crows in the system with hardware details
- * Supports both single and batch provisioning
  */
 const Provision: React.FC = () => {
   const navigate = useNavigate();
@@ -80,7 +82,7 @@ const Provision: React.FC = () => {
   
   // State for dropdowns
   const [manufacturers, setManufacturers] = useState<ManufacturerWithModels[]>([]);
-  const [osImages, setOsImages] = useState<OsVersion[]>([]);
+  const [osVersions, setOsVersions] = useState<OSVersionsFormApi.OSVersionsResponse['versions']>([]);
   const [loading, setLoading] = useState({
     manufacturers: false,
     osImages: false
@@ -94,7 +96,7 @@ const Provision: React.FC = () => {
     validateForm, 
     resetForm,
     setValues
-  } = useCrowForm<ExtendedCrowFormData>(
+  } = useCrowForm<ProvisionFormData>(
     {
       crow_id: '',
       manufacturer: '',
@@ -102,8 +104,7 @@ const Provision: React.FC = () => {
       cpu: '',
       ram: '',
       storage: '',
-      os_image_version: '',
-      site_id: '',
+      firmware_version: '',
       csvFile: null
     },
     getValidationRules(mode)
@@ -117,7 +118,7 @@ const Provision: React.FC = () => {
       crow_id: { required: currentMode === 'single', message: 'Crow ID is required' },
       manufacturer: { required: currentMode === 'single', message: 'Manufacturer is required' },
       model: { required: currentMode === 'single', message: 'Model is required' },
-      os_image_version: { required: currentMode === 'single', message: 'OS Image Version is required' },
+      firmware_version: { required: currentMode === 'single', message: 'Firmware Version is required' },
       csvFile: { required: currentMode === 'multiple', message: 'CSV file is required' }
     };
   }
@@ -132,7 +133,7 @@ const Provision: React.FC = () => {
     }
     
     fetchManufacturers();
-    fetchOsImages();
+    fetchOsVersions();
   }, [isAuthenticated, navigate]);
 
   /**
@@ -145,19 +146,35 @@ const Provision: React.FC = () => {
       // Get auth token if available (optional for this endpoint)
       const token = await getAuthToken();
       
-      const response = await getCrowModels('*', undefined, token || undefined);
+      // Use the API structure from crow-form-apis.ts
+      const request: CrowModelsFormApi.FetchAllModelsRequest = {
+        function: 'fetch_crowmodels_all'
+      };
       
-      if (response.success && response.data) {
+      const response = await callFormApi<
+        CrowModelsFormApi.FetchAllModelsRequest, 
+        CrowModelsFormApi.ModelsResponse
+      >(request, token || '');
+      
+      if (response && response.models) {
         // Transform the data to match ManufacturerWithModels structure
-        const transformedData: ManufacturerWithModels[] = response.data.map((item: any) => ({
-          manufacturer_id: item.manufacturer_id,
-          manufacturer_name: item.manufacturer_name,
-          models: Array.isArray(item.models) ? item.models : []
-        }));
+        const transformedData: ManufacturerWithModels[] = response.models
+          .filter(item => item.manufacturer) // Ensure manufacturer exists
+          .map(item => ({
+            manufacturer: item.manufacturer,
+            manufacturer_name: item.manufacturer, // Use manufacturer as name if no separate name
+            models: Array.isArray(item.models) 
+              ? item.models.map(modelName => ({
+                  model: modelName,
+                  model_name: modelName,
+                  specs: {}
+                }))
+              : []
+          }));
         
         setManufacturers(transformedData);
       } else {
-        throw new Error(response.message || 'Failed to fetch manufacturers');
+        throw new Error('Failed to fetch manufacturers');
       }
     } catch (error) {
       console.error('Error fetching manufacturers:', error);
@@ -170,19 +187,29 @@ const Provision: React.FC = () => {
   /**
    * Fetch active OS images
    */
-  const fetchOsImages = async () => {
+  const fetchOsVersions = async () => {
     try {
       setLoading(prev => ({ ...prev, osImages: true }));
       
-      const response = await getOsVersions();
+      // Use the API structure from crow-form-apis.ts
+      const request: OSVersionsFormApi.FetchAllOSVersionsRequest = {
+        function: 'fetch_os_versions_all'
+      };
       
-      if (response.success && response.data) {
-        setOsImages(response.data);
+      const token = await getAuthToken();
+      
+      const response = await callFormApi<
+        OSVersionsFormApi.FetchAllOSVersionsRequest,
+        OSVersionsFormApi.OSVersionsResponse
+      >(request, token || '');
+      
+      if (response && response.versions) {
+        setOsVersions(response.versions);
       } else {
-        throw new Error(response.message || 'Failed to fetch OS images');
+        throw new Error('Failed to fetch OS versions');
       }
     } catch (error) {
-      console.error('Error fetching OS images:', error);
+      console.error('Error fetching OS versions:', error);
       setError('Failed to load OS image versions. Please try again.');
     } finally {
       setLoading(prev => ({ ...prev, osImages: false }));
@@ -194,16 +221,16 @@ const Provision: React.FC = () => {
    */
   useEffect(() => {
     if (values.manufacturer && values.model) {
-      const selectedManufacturer = manufacturers.find(m => m.manufacturer_id === values.manufacturer);
+      const selectedManufacturer = manufacturers.find(m => m.manufacturer === values.manufacturer);
       if (selectedManufacturer) {
         // Find the model in the models array
-        const selectedModel = selectedManufacturer.models?.find((m: { model_id: string }) => m.model_id === values.model);
-        if (selectedModel) {
+        const selectedModel = selectedManufacturer.models?.find(m => m.model === values.model);
+        if (selectedModel && selectedModel.specs) {
           setValues(prev => ({
             ...prev,
-            cpu: selectedModel.cpu || '',
-            ram: selectedModel.ram || '',
-            storage: selectedModel.storage || ''
+            cpu: selectedModel.specs?.cpu || '',
+            ram: selectedModel.specs?.ram || '',
+            storage: selectedModel.specs?.storage || ''
           }));
         }
       }
@@ -211,12 +238,46 @@ const Provision: React.FC = () => {
   }, [values.manufacturer, values.model, manufacturers, setValues]);
 
   /**
+   * Fetch model details for a specific manufacturer/model
+   */
+  const fetchModelDetails = async (manufacturer: string, model: string) => {
+    try {
+      const token = await getAuthToken();
+      
+      // Use the API structure from crow-form-apis.ts
+      const request: CrowModelsFormApi.FetchModelDetailsRequest = {
+        function: 'fetch_crowmodel_details',
+        manufacturer,
+        model
+      };
+      
+      const response = await callFormApi<
+        CrowModelsFormApi.FetchModelDetailsRequest,
+        CrowModelsFormApi.ModelDetailsResponse
+      >(request, token || '');
+      
+      if (response && response.model && response.model.specs) {
+        const { cpu, ram, storage } = response.model.specs;
+        
+        setValues(prev => ({
+          ...prev,
+          cpu: cpu || '',
+          ram: ram || '',
+          storage: storage || ''
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching model details:', error);
+    }
+  };
+
+  /**
    * Convert manufacturers to select options
    */
   const getManufacturerOptions = (): SelectOption[] => {
     return manufacturers.map(manufacturer => ({
-      value: manufacturer.manufacturer_id,
-      label: manufacturer.manufacturer_name
+      value: manufacturer.manufacturer,
+      label: manufacturer.manufacturer_name || manufacturer.manufacturer
     }));
   };
 
@@ -226,12 +287,12 @@ const Provision: React.FC = () => {
   const getModelOptions = (): SelectOption[] => {
     if (!values.manufacturer) return [];
     
-    const selectedManufacturer = manufacturers.find(m => m.manufacturer_id === values.manufacturer);
+    const selectedManufacturer = manufacturers.find(m => m.manufacturer === values.manufacturer);
     if (!selectedManufacturer || !selectedManufacturer.models) return [];
     
-    return selectedManufacturer.models.map((model: { model_id: string; model_name: string }) => ({
-      value: model.model_id,
-      label: model.model_name
+    return selectedManufacturer.models.map(model => ({
+      value: model.model,
+      label: model.model_name || model.model
     }));
   };
   
@@ -243,21 +304,35 @@ const Provision: React.FC = () => {
     
     try {
       const token = await getAuthToken();
-      const response = await getCrowModels(manufacturerId, "*", token || undefined);
       
-      if (response.success && response.data && response.data.length > 0) {
+      // Use the API structure from crow-form-apis.ts
+      const request: CrowModelsFormApi.FetchModelsByManufacturerRequest = {
+        function: 'fetch_crowmodels_by_manufacturer',
+        manufacturer: manufacturerId
+      };
+      
+      const response = await callFormApi<
+        CrowModelsFormApi.FetchModelsByManufacturerRequest,
+        CrowModelsFormApi.ModelsResponse
+      >(request, token || '');
+      
+      if (response && response.models && response.models.length > 0) {
         // Update just the models for this manufacturer in the manufacturers array
         setManufacturers(prev => {
           const updated = [...prev];
-          const index = updated.findIndex(m => m.manufacturer_id === manufacturerId);
+          const index = updated.findIndex(m => m.manufacturer === manufacturerId);
           
-          if (index !== -1 && response.data && response.data[0]) {
-            // Transform to ManufacturerWithModels using a type assertion first
-            const item = response.data[0] as any;
+          if (index !== -1 && response.models && response.models[0]) {
+            const item = response.models[0];
+            const modelsList = Array.isArray(item.models) ? item.models : [];
+            
             updated[index] = {
-              manufacturer_id: item.manufacturer_id,
-              manufacturer_name: item.manufacturer_name,
-              models: Array.isArray(item.models) ? item.models : []
+              ...updated[index],
+              models: modelsList.map(modelName => ({
+                model: modelName,
+                model_name: modelName,
+                specs: {} // Default empty specs, will be filled when specific model is selected
+              }))
             };
           }
           
@@ -270,12 +345,12 @@ const Provision: React.FC = () => {
   };
 
   /**
-   * Convert OS images to select options
+   * Convert OS versions to select options
    */
-  const getOsImageOptions = (): SelectOption[] => {
-    return osImages.map(osImage => ({
-      value: osImage.id,
-      label: osImage.name
+  const getOsVersionOptions = (): SelectOption[] => {
+    return osVersions.map(osVersion => ({
+      value: osVersion.version,
+      label: `${osVersion.version}${osVersion.recommended ? ' (Recommended)' : ''}`
     }));
   };
 
@@ -296,6 +371,18 @@ const Provision: React.FC = () => {
   };
 
   /**
+   * Handle model change and fetch specs
+   */
+  const handleModelChange = (value: string) => {
+    handleChange('model', value);
+    
+    // Fetch model details if manufacturer and model are selected
+    if (values.manufacturer && value) {
+      fetchModelDetails(values.manufacturer, value);
+    }
+  };
+
+  /**
    * Toggle between single and multiple provision modes
    */
   const toggleMode = (newMode: ProvisionMode) => {
@@ -307,7 +394,7 @@ const Provision: React.FC = () => {
   /**
    * Handle CSV file selection
    */
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       handleChange('csvFile', e.target.files[0]);
     }
@@ -330,32 +417,48 @@ const Provision: React.FC = () => {
     try {
       if (mode === 'single') {
         // Make sure all required values are present
-        if (!values.crow_id || !values.manufacturer || !values.model || !values.os_image_version) {
+        if (!values.crow_id || !values.manufacturer || !values.model || !values.firmware_version) {
           setError('All fields are required');
           setIsLoading(false);
           return;
         }
         
-        // Use the provisionCrow function from userApi
-        const response = await provisionCrow({
-          crow_id: values.crow_id || '',
-          manufacturer: values.manufacturer || '',
-          model: values.model || '',
-          os_image_version: values.os_image_version || ''
-        });
+        const token = await getAuthToken();
+        if (!token) {
+          setError('Authentication required. Please sign in again.');
+          navigate('/signin', { state: { returnUrl: '/provision' } });
+          return;
+        }
         
-        if (response.success) {
+        // Use the ProvisionApi interface from crow-management-api.ts
+        const request: ProvisionApi.ProvisionRequest = {
+          function: 'provision',
+          crow_id: values.crow_id,
+          manufacturer: values.manufacturer,
+          model: values.model,
+          firmware_version: values.firmware_version
+        };
+        
+        const response = await callCrowApi<
+          ProvisionApi.ProvisionRequest,
+          ProvisionApi.ProvisionResponse
+        >(
+          'provision',
+          API_CONFIG.endpoints.provision,
+          request,
+          token
+        );
+        
+        if (response && response.statusCode === 200) {
           setSuccess(true);
         } else {
-          setError(response.message || 'An error occurred during provisioning');
+          setError(response?.message || 'An error occurred during provisioning');
         }
       } else if (values.csvFile) {
-        // For multiple mode with CSV, we need to use FormData
-        const formData = new FormData();
-        formData.append('csvFile', values.csvFile);
+        // For multiple mode with CSV, we would need to implement batch provisioning
+        // This would use the BatchProvisionRequest from ProvisionApi
         
-        // Special handling for FormData, would need additional implementation
-        // This would require a different API function that supports FormData
+        // For now, just show an error message
         setError('Batch provisioning with CSV is not yet implemented in the API service');
       }
     } catch (error: any) {
@@ -415,10 +518,10 @@ const Provision: React.FC = () => {
         <li><span className="text-cyan-200 font-medium">crow_id</span> - Unique identifier for each Crow</li>
         <li><span className="text-cyan-200 font-medium">manufacturer</span> - Device manufacturer name</li>
         <li><span className="text-cyan-200 font-medium">model</span> - Device model number/name</li>
-        <li><span className="text-cyan-200 font-medium">os_image_version</span> - OS Image Version</li>
+        <li><span className="text-cyan-200 font-medium">firmware_version</span> - Firmware Version</li>
       </ul>
       <p className="text-slate-300 mb-2">
-        Example: <span className="text-xs text-cyan-200 font-mono bg-slate-700 p-1 rounded">crow_id,manufacturer,model,os_image_version</span>
+        Example: <span className="text-xs text-cyan-200 font-mono bg-slate-700 p-1 rounded">crow_id,manufacturer,model,firmware_version</span>
       </p>
       <p className="text-slate-300 mb-4">
         <span className="text-cyan-300">Important:</span> The first line of your CSV file must contain these exact column headers as shown in the example above.
@@ -500,7 +603,7 @@ const Provision: React.FC = () => {
         id="model"
         label="Model"
         value={values.model || ''}
-        onChange={(value) => handleChange('model', value)}
+        onChange={handleModelChange}
         options={getModelOptions()}
         placeholder="Select model"
         disabled={isLoading || !values.manufacturer}
@@ -541,14 +644,14 @@ const Provision: React.FC = () => {
       />
 
       <FormSelect
-        id="os_image_version"
-        label="OS Image Version"
-        value={values.os_image_version || ''}
-        onChange={(value) => handleChange('os_image_version', value)}
-        options={getOsImageOptions()}
-        placeholder="Select OS image version"
+        id="firmware_version"
+        label="Firmware Version"
+        value={values.firmware_version || ''}
+        onChange={(value) => handleChange('firmware_version', value)}
+        options={getOsVersionOptions()}
+        placeholder="Select firmware version"
         disabled={isLoading || loading.osImages}
-        error={errors.os_image_version}
+        error={errors.firmware_version}
       />
     </>
   );

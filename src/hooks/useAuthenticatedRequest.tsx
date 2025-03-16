@@ -1,10 +1,19 @@
 import { useState, useContext, useCallback, useEffect, useRef } from 'react';
+import { jwtDecode } from 'jwt-decode';
 import { AuthContext } from '../contexts/AuthContext';
 import { 
   ApiResponse, 
   makeApiRequest, 
   API_CONFIG
 } from '../services/apiService';
+
+/**
+ * Interface for decoded JWT token
+ */
+interface DecodedToken {
+  'cognito:groups'?: string[] | string;
+  [key: string]: any;
+}
 
 /**
  * Enhanced hook that combines API requests with Cognito authentication
@@ -38,7 +47,64 @@ export const useAuthenticatedRequest = (
   } = useContext(AuthContext);
 
   /**
-   * Fetch user groups from the backend if not available in user object
+   * Extract user groups from JWT token
+   * @param token JWT token
+   * @returns Array of user groups
+   */
+  const extractGroupsFromToken = useCallback(async (token: string): Promise<string[]> => {
+    try {
+      // Decode the JWT token
+      const decoded: DecodedToken = jwtDecode(token);
+      
+      // Extract user groups
+      if (decoded['cognito:groups']) {
+        // Handle both string and array formats
+        if (typeof decoded['cognito:groups'] === 'string') {
+          return decoded['cognito:groups'].split(',').map(g => g.trim());
+        } else if (Array.isArray(decoded['cognito:groups'])) {
+          return decoded['cognito:groups'];
+        }
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('Error decoding JWT token:', error);
+      throw error;
+    }
+  }, []);
+
+  /**
+   * Fetch user groups from API as fallback method
+   */
+  const fetchUserGroupsFromAPI = useCallback(async (token: string): Promise<string[]> => {
+    try {
+      // Check if API_CONFIG has usergroups endpoint
+      if (!API_CONFIG.ENDPOINTS.USER_GROUPS) {
+        console.warn('USER_GROUPS endpoint not defined in API_CONFIG');
+        return [];
+      }
+      
+      // Make API request to get groups
+      const result = await makeApiRequest(
+        API_CONFIG.ENDPOINTS.USER_GROUPS,
+        { operation: API_CONFIG.OPERATIONS.GET_USER_GROUPS },
+        token
+      );
+      
+      if (result.success && result.data) {
+        const groups = result.data.groups || [];
+        return Array.isArray(groups) ? groups : [groups];
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('Error fetching user groups from API:', error);
+      return [];
+    }
+  }, []);
+
+  /**
+   * Fetch user groups using JWT decoding with API fallback
    */
   const fetchUserGroups = useCallback(async () => {
     // Prevent multiple simultaneous fetches
@@ -54,7 +120,7 @@ export const useAuthenticatedRequest = (
         return;
       }
       
-      // Get token for the request
+      // Get token for decoding
       const token = await getAuthToken();
       if (!token) {
         console.error('Failed to get auth token for group fetch');
@@ -63,31 +129,24 @@ export const useAuthenticatedRequest = (
         return;
       }
       
-      // Check if API_CONFIG has usergroups endpoint
-      if (!API_CONFIG.ENDPOINTS.USER_GROUPS) {
-        console.warn('USER_GROUPS endpoint not defined in API_CONFIG');
-        // If unable to fetch groups, we'll assume access for now
-        setUserGroups([]);
-        setGroupsLoaded(true);
-        fetchingGroups.current = false;
-        return;
+      // First try to extract groups from JWT token
+      try {
+        const groupsFromToken = await extractGroupsFromToken(token);
+        if (groupsFromToken.length > 0) {
+          console.log('Groups extracted from JWT token:', groupsFromToken);
+          setUserGroups(groupsFromToken);
+          setGroupsLoaded(true);
+          fetchingGroups.current = false;
+          return;
+        }
+      } catch (error) {
+        console.warn('Failed to extract groups from JWT, falling back to API');
       }
       
-      // Make API request to get groups
-      const result = await makeApiRequest(
-        API_CONFIG.ENDPOINTS.USER_GROUPS,
-        { operation: API_CONFIG.OPERATIONS.GET_USER_GROUPS },
-        token
-      );
-      
-      if (result.success && result.data) {
-        const groups = result.data.groups || [];
-        console.log('Fetched user groups:', groups);
-        
-        setUserGroups(groups);
-      } else {
-        console.error('Failed to fetch user groups:', result.message);
-      }
+      // If JWT extraction failed or returned empty, fall back to API
+      const groupsFromAPI = await fetchUserGroupsFromAPI(token);
+      console.log('Groups fetched from API:', groupsFromAPI);
+      setUserGroups(groupsFromAPI);
       
       setGroupsLoaded(true);
     } catch (error) {
@@ -98,7 +157,7 @@ export const useAuthenticatedRequest = (
     } finally {
       fetchingGroups.current = false;
     }
-  }, [isAuthenticated, getAuthToken]);
+  }, [isAuthenticated, getAuthToken, extractGroupsFromToken, fetchUserGroupsFromAPI]);
 
   // Check if user has required group permissions
   useEffect(() => {

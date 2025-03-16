@@ -100,6 +100,27 @@ export const toolLinks = [
   {
     path: '/styleguide',
     label: 'Style Guide'
+  },
+  {
+    path: '/profile',
+    label: 'My Profile'
   }
-
+];
+export const adminLinks = [
+  {
+    path: '/admin/dashboard',
+    label: 'Admin Dashboard'
+  },
+  {
+    path: '/admin/users',
+    label: 'User Management'
+  },
+  {
+    path: '/admin/sites',
+    label: 'Site Management'
+  },
+  {
+    path: '/admin/workcells',
+    label: 'Workcell Management'
+  }
 ];
