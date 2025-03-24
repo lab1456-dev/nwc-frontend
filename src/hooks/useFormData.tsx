@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
-import { useAuthContext } from '../contexts/AuthContext';
+import { useState, useEffect, useContext } from 'react';
+import { AuthContext } from '../contexts/AuthContext';
 import { callFormApi } from '../services/api/crow-form-apis';
 
 /**
  * Custom hook for fetching form data for dropdowns and other form elements
  */
-export const useFormData = <RequestType extends any, ResponseType extends any>(
+export const useFormData = <ResponseType extends any>(
   requestFunction: (token: string) => Promise<ResponseType>,
   dependencies: any[] = []
 ) => {
@@ -13,7 +13,7 @@ export const useFormData = <RequestType extends any, ResponseType extends any>(
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const { getAuthToken } = useAuthContext();
+  const { getAuthToken } = useContext(AuthContext);
   
   useEffect(() => {
     const fetchData = async () => {

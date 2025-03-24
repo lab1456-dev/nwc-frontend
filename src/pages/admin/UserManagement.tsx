@@ -1,6 +1,6 @@
 // src/pages/admin/UserManagement.tsx
 import React, { useState } from 'react';
-import AdminLayout from '../../components/admin/AdminLayout';
+import AdminLayout from './AdminLayout';
 
 const UserManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');

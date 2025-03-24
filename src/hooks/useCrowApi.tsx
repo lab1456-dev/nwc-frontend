@@ -1,9 +1,7 @@
-import { useState } from 'react';
-import { useAuthContext } from '../contexts/AuthContext';
+import { useState, useContext } from 'react';
+import { AuthContext } from '../contexts/AuthContext';
 import { 
-  buildApiRequest, 
   callCrowApi,
-  API_CONFIG,
   OperationType
 } from '../services/api/crow-management-api';
 import type { ApiRequest, ApiResponse } from '../services/api/crow-management-api';
@@ -21,7 +19,7 @@ export const useCrowApi = <RequestType extends ApiRequest, ResponseType extends 
   const [success, setSuccess] = useState(false);
   const [data, setData] = useState<ResponseType | null>(null);
   
-  const { getAuthToken } = useAuthContext();
+  const { getAuthToken } = useContext(AuthContext);
   
   /**
    * Make an API request with the provided data

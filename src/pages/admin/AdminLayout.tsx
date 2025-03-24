@@ -1,6 +1,6 @@
 // src/components/admin/AdminLayout.tsx
 import React from 'react';
-import { RequireGroup } from '../authRoleComponents';
+import { RequireGroup } from '../../components/authRoleComponents';
 
 interface AdminLayoutProps {
   children: React.ReactNode;

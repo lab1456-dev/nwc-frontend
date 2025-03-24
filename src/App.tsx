@@ -11,8 +11,8 @@ import Unauthorized from './components/common/Unauthorized';
 //Pages
 import LandingPage from './pages/LandingPage';
 import Provision from './pages/tools/Provision';
-import StyleGuide from './pages/tools/StyleGuide';
-import Profile from './pages/tools/Profile';
+//import StyleGuide from './pages/tools/StyleGuide';
+//import Profile from './pages/tools/Profile';
 
 //Features - Everyone
 import AddressTranslation from './pages/features/AddressTranslation';
@@ -53,7 +53,6 @@ const App: React.FC = () => {
           <Route path="/" element={<LandingPage />} />
           <Route path="/signin" element={<SignInPage />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
-          <Route path="/styleguide" element={<RequiredAuth><StyleGuide /></RequiredAuth>} />
           <Route path="/provision" element={<RequiredAuth><Provision /></RequiredAuth>} />
           <Route path="/address-translation" element={<AddressTranslation />} />
           <Route path="/asset-discovery" element={<AssetDiscovery />} />
