@@ -55,7 +55,7 @@ export namespace CrowsFormApi {
   }
   
   export interface FetchCrowDetailsRequest extends FormRequestBody {
-    function: 'fetch_crow_details';
+    function: 'fetch_crows_details';
     crow_id: string;
   }
   

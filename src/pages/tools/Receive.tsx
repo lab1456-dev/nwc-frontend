@@ -96,11 +96,11 @@ const Receive: React.FC = () => {
     const newErrors: Record<string, string> = {};
     
     if (values.crow_id && values.crow_id.length < 2) {
-      newErrors.crow_id = 'Crow ID must be at least 2 characters';
+      newErrors.crow_id = 'Crow ID must be at least 8 characters';
     }
     
     if (values.site_id && values.site_id.length < 2) {
-      newErrors.site_id = 'Site ID must be at least 2 characters';
+      newErrors.site_id = 'Site ID must be at least 4 characters';
     }
     
     // If there are errors, return false

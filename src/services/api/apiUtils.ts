@@ -3,7 +3,7 @@
  * Common functions for making API requests
  */
 
-import { API_BASE_URL, API_PROVISION_KEY } from './apiConfig';
+import { API_BASE} from './apiConfig';
 import type { ApiResponse, HttpMethod, AuthType } from './apiTypes';
 
 /**
@@ -13,9 +13,9 @@ import type { ApiResponse, HttpMethod, AuthType } from './apiTypes';
  */
 export const buildApiUrl = (endpoint: string): string => {
   // Remove trailing slash from base URL if it exists
-  const cleanBaseUrl = API_BASE_URL.endsWith('/') 
-    ? API_BASE_URL.slice(0, -1) 
-    : API_BASE_URL;
+  const cleanBaseUrl = API_BASE.endsWith('/') 
+    ? API_BASE.slice(0, -1) 
+    : API_BASE;
   
   // Ensure endpoint starts with a slash
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
@@ -37,8 +37,6 @@ export const getAuthHeader = (
   switch (authType) {
     case 'Bearer':
       return token ? { 'Authorization': `Bearer ${token}` } : {};
-    case 'ApiKey':
-      return { 'x-api-key': API_PROVISION_KEY };
     case 'None':
     default:
       return {};
@@ -100,21 +98,6 @@ export const makeApiRequest = async <T = any>(
     // Add body for non-GET requests
     if (method !== 'GET' && Object.keys(data).length > 0) {
       fetchOptions.body = safeStringify(data);
-    }
-    
-    // Log request details (with sensitive data redacted)
-    if (process.env.NODE_ENV !== 'production') {
-      console.debug('API Request:', {
-        url,
-        method,
-        operation: data.operation,
-        // Exclude sensitive data from logging
-        headers: {
-          ...headers,
-          Authorization: headers.Authorization ? '[REDACTED]' : undefined,
-          'x-api-key': headers['x-api-key'] ? '[REDACTED]' : undefined
-        }
-      });
     }
     
     // Make the request

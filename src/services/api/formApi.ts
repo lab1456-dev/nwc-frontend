@@ -1,213 +1,180 @@
-/**
- * Form API Operations
- * Functions for interacting with the manageCrowForms endpoint
- */
+// formApi.ts - Specialized API definitions for Form data operations
 
-import { ENDPOINTS, OPERATIONS } from './apiConfig';
-import { makeApiRequest } from './apiUtils';
-import type { 
-  ApiResponse, 
-  GetCrowsRequest,
-  GetSitesRequest,
-  GetWorkCellsRequest,
-  GetCrowModelsRequest,
-  GetOsVersionsRequest,
-  Site,
-  WorkCell,
-  CrowModel,
-  OsVersion,
-  Crow
-} from './apiTypes';
+import { FormApiResponse } from './apiService';
+import { API_CONFIG } from './apiConfig';
 
 /**
- * Get Crows by status and optionally ID
- * @param data Crow query parameters
- * @param token Auth token
- * @returns Promise resolving to API response with Crows
+ * FormApi namespace containing types and functions specific to form data operations
  */
-export const getCrows = async (
-  data: GetCrowsRequest,
-  token: string
-): Promise<ApiResponse<{crows: Crow[], count: number}>> => {
-  return makeApiRequest(
-    ENDPOINTS.FORMS,
-    {
-      operation: OPERATIONS.FORM.CROWS,
-      ...data
-    },
-    'Bearer',
-    token
-  );
-};
-
-/**
- * Get Sites by ID (or all sites)
- * @param data Site query parameters
- * @param token Auth token
- * @returns Promise resolving to API response with Sites
- */
-export const getSites = async (
-  data: GetSitesRequest,
-  token: string
-): Promise<ApiResponse<{sites: Site[], count: number}>> => {
-  return makeApiRequest<{sites: Site[], count: number}>(
-    ENDPOINTS.FORMS,
-    {
-      operation: OPERATIONS.FORM.SITES,
-      ...data
-    },
-    'Bearer',
-    token
-  );
-};
-
-/**
- * Get Work Cells by site and optionally ID
- * @param data Work Cell query parameters
- * @param token Auth token
- * @returns Promise resolving to API response with Work Cells
- */
-export const getWorkCells = async (
-  data: GetWorkCellsRequest,
-  token: string
-): Promise<ApiResponse<{workcells: WorkCell[], count: number}>> => {
-  return makeApiRequest(
-    ENDPOINTS.FORMS,
-    {
-      operation: OPERATIONS.FORM.WORKCELLS,
-      ...data
-    },
-    'Bearer',
-    token
-  );
-};
-/**
- * Get OS Version by site and optionally ID
- * @param data Work Cell query parameters
- * @param token Auth token
- * @returns Promise resolving to API response with Work Cells
- */
-export const getOsVersion = async (
-  data:  GetOsVersionsRequest,
-  token: string
-): Promise<ApiResponse<{workcells: OsVersion[], count: number}>> => {
-  return makeApiRequest(
-    ENDPOINTS.FORMS,
-    {
-      operation: OPERATIONS.FORM.WORKCELLS,
-      ...data
-    },
-    'Bearer',
-    token
-  );
-};
-
-/**
- * Get Crow Models by manufacturer and optionally model
- * @param manufacturerId Optional manufacturer ID
- * @param modelId Optional model ID
- * @param token Optional auth token
- * @returns Promise resolving to API response with Crow Models
- */
-export const getCrowModels = async (
-  manufacturerId?: string,
-  modelId?: string,
-  token?: string
-): Promise<ApiResponse<CrowModel[]>> => {
-  const data: GetCrowModelsRequest = {};
-  
-  if (manufacturerId) {
-    data.manufacturer = manufacturerId;
+export namespace FormApi {
+  // General form request interface
+  export interface FormDataRequest {
+    function: string;
+    [key: string]: any;
   }
   
-  if (modelId) {
-    data.model = modelId;
+  // Models
+  export interface ModelsResponse extends FormApiResponse {
+    data: {
+      models: Array<{
+        manufacturer: string;
+        models: string[] | any;
+      }>;
+    };
   }
   
-  return makeApiRequest(
-    ENDPOINTS.FORMS,
-    {
-      operation: OPERATIONS.FORM.CROW_MODELS,
-      ...data
-    },
-    token ? 'Bearer' : 'None',
-    token
-  );
-};
-
-/**
- * Get active OS image versions
- * @param token Optional auth token
- * @returns Promise resolving to API response with OS Versions
- */
-export const getOsVersions = async (
-  token?: string
-): Promise<ApiResponse<OsVersion[]>> => {
-  return makeApiRequest(
-    ENDPOINTS.FORMS,
-    { operation: OPERATIONS.FORM.OS_VERSIONS },
-    token ? 'Bearer' : 'None',
-    token
-  );
-};
-
-/**
- * Get available Crows for a specific site
- * @param siteId The site ID to filter crows by
- * @param status The status to filter crows by (defaults to 'received')
- * @param token Auth token
- * @returns Promise resolving to API response with available Crows
- */
-export const getAvailableCrowsForSite = async (
-  siteId: string,
-  status: string = 'received',
-  token: string
-): Promise<ApiResponse<{crows: Crow[], count: number}>> => {
-  return makeApiRequest(
-    ENDPOINTS.FORMS,
-    {
-      operation: OPERATIONS.FORM.CROWS,
-      site_id: siteId,
-      status: status
-    },
-    'Bearer',
-    token
-  );
-};
-
-/**
- * Get work cells for a specific site
- * @param siteId The site ID to filter work cells by
- * @param token Auth token
- * @returns Promise resolving to API response with work cells
- */
-export const getWorkCellsForSite = async (
-  siteId: string,
-  token: string
-): Promise<ApiResponse<{workcells: WorkCell[], count: number}>> => {
-  return makeApiRequest(
-    ENDPOINTS.FORMS,
-    {
-      operation: OPERATIONS.FORM.WORKCELLS,
-      site_id: siteId
-    },
-    'Bearer',
-    token
-  );
-};
-
-/**
- * Get user groups for the current user
- * @param token Auth token
- * @returns Promise resolving to API response with user groups
- */
-export const getUserGroups = async (
-  token: string
-): Promise<ApiResponse<string[]>> => {
-  return makeApiRequest(
-    ENDPOINTS.USER_GROUPS,
-    { operation: OPERATIONS.USER_GROUP.GET_GROUPS },
-    'Bearer',
-    token
-  );
-};
+  export interface ModelDetailsResponse extends FormApiResponse {
+    data: {
+      model: {
+        manufacturer: string;
+        model: string;
+        specs?: {
+          cpu?: string;
+          ram?: string;
+          storage?: string;
+          [key: string]: any;
+        };
+        [key: string]: any;
+      };
+    };
+  }
+  
+  // OS Versions
+  export interface OSVersionResponse extends FormApiResponse {
+    data: {
+      versions: Array<{
+        version: string;
+        releaseDate?: string;
+        status?: string;
+        recommended?: boolean;
+      }>;
+    };
+  }
+  
+  // Sites
+  export interface SitesResponse extends FormApiResponse {
+    data: {
+      sites: Array<{
+        site_id: string;
+        site_name: string;
+        site_code?: string;
+        [key: string]: any;
+      }>;
+    };
+  }
+  
+  // Workcells
+  export interface WorkcellsResponse extends FormApiResponse {
+    data: {
+      workcells: Array<{
+        workcell_id: string;
+        site_id: string;
+        workcell_type: string;
+        is_protected: boolean;
+        protected_by?: string;
+        [key: string]: any;
+      }>;
+    };
+  }
+  
+  /**
+   * Fetch all manufacturers and models
+   * 
+   * @param token Authentication token
+   * @returns Promise resolving to the models response
+   */
+  export async function fetchAllModels(token: string): Promise<ModelsResponse> {
+    // Import here to avoid circular dependencies
+    const { callApi } = await import('./apiService');
+    
+    return callApi<FormDataRequest, ModelsResponse>(
+      API_CONFIG.ENDPOINTS.MANAGE_CROW_FORMS,
+      {
+        operation: API_CONFIG.OPERATIONS.FETCH_MODELS,
+        body: {
+          function: API_CONFIG.FUNCTIONS.FETCH_MODELS_ALL
+        }
+      },
+      token
+    );
+  }
+  
+  /**
+   * Fetch models for a specific manufacturer
+   * 
+   * @param manufacturer Manufacturer identifier
+   * @param token Authentication token
+   * @returns Promise resolving to the models response
+   */
+  export async function fetchModelsByManufacturer(
+    manufacturer: string,
+    token: string
+  ): Promise<ModelsResponse> {
+    // Import here to avoid circular dependencies
+    const { callApi } = await import('./apiService');
+    
+    return callApi<FormDataRequest, ModelsResponse>(
+      API_CONFIG.ENDPOINTS.MANAGE_CROW_FORMS,
+      {
+        operation: API_CONFIG.OPERATIONS.FETCH_MODELS,
+        body: {
+          function: API_CONFIG.FUNCTIONS.FETCH_MODELS_BY_MANUFACTURER,
+          manufacturer
+        }
+      },
+      token
+    );
+  }
+  
+  /**
+   * Fetch details for a specific model
+   * 
+   * @param manufacturer Manufacturer identifier
+   * @param model Model identifier
+   * @param token Authentication token
+   * @returns Promise resolving to the model details response
+   */
+  export async function fetchModelDetails(
+    manufacturer: string,
+    model: string,
+    token: string
+  ): Promise<ModelDetailsResponse> {
+    // Import here to avoid circular dependencies
+    const { callApi } = await import('./apiService');
+    
+    return callApi<FormDataRequest, ModelDetailsResponse>(
+      API_CONFIG.ENDPOINTS.MANAGE_CROW_FORMS,
+      {
+        operation: API_CONFIG.OPERATIONS.FETCH_MODELS,
+        body: {
+          function: API_CONFIG.FUNCTIONS.FETCH_MODEL_DETAILS,
+          manufacturer,
+          model
+        }
+      },
+      token
+    );
+  }
+  
+  /**
+   * Fetch all available OS versions
+   * 
+   * @param token Authentication token
+   * @returns Promise resolving to the OS versions response
+   */
+  export async function fetchAllOSVersions(token: string): Promise<OSVersionResponse> {
+    // Import here to avoid circular dependencies
+    const { callApi } = await import('./apiService');
+    
+    return callApi<FormDataRequest, OSVersionResponse>(
+      API_CONFIG.ENDPOINTS.MANAGE_CROW_FORMS,
+      {
+        operation: API_CONFIG.OPERATIONS.FETCH_OS_VERSIONS,
+        body: {
+          function: API_CONFIG.FUNCTIONS.FETCH_OS_VERSIONS_ALL
+        }
+      },
+      token
+    );
+  }
+}

@@ -1,5 +1,3 @@
-import { CognitoUserSession } from 'amazon-cognito-identity-js';
-
 // Define a type for the user object based on typical Cognito attributes
 export interface CognitoUserAttributes {
   email?: string;
@@ -10,6 +8,15 @@ export interface CognitoUserAttributes {
   family_name?: string;
   preferred_username?: string;
   [key: string]: string | undefined; // Allow for other custom attributes
+}
+
+// Define response interface for auth challenge
+export interface AuthChallengeResponse {
+  success: boolean;
+  challengeName?: string;
+  message?: string;
+  userAttributes?: any;
+  requiredAttributes?: any;
 }
 
 // Define a session type for Cognito
@@ -23,9 +30,11 @@ export interface CognitoSessionData {
 export interface AuthContextType {
   isAuthenticated: boolean;
   user: CognitoUserAttributes | null;
-  signIn: (username: string, password: string, mfaCode?: string) => Promise<CognitoUserSession>;
+  signIn: (username: string, password: string, mfaCode?: string) => Promise<AuthChallengeResponse>;
   signOut: () => void;
   loading: boolean;
   mfaRequired: boolean;
-  getAuthToken: () => Promise<string | null>;  // New method to get the auth token
+  newPasswordRequired: boolean;
+  completeNewPasswordChallenge: (newPassword: string) => Promise<AuthChallengeResponse>;
+  getAuthToken: () => Promise<string | null>;
 }

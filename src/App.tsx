@@ -11,12 +11,6 @@ import Unauthorized from './components/common/Unauthorized';
 //Pages
 import LandingPage from './pages/LandingPage';
 import Provision from './pages/tools/Provision';
-import Receive from './pages/tools/Receive';
-import Deploy from './pages/tools/Deploy';
-import Replace from './pages/tools/Replace';
-import Transfer from './pages/tools/Transfer';
-import SuspendReactivate from './pages/tools/SuspendReactivate';
-import Retire from './pages/tools/Retire';
 import StyleGuide from './pages/tools/StyleGuide';
 import Profile from './pages/tools/Profile';
 
@@ -59,15 +53,8 @@ const App: React.FC = () => {
           <Route path="/" element={<LandingPage />} />
           <Route path="/signin" element={<SignInPage />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
-          <Route path="/provision" element={<RequiredAuth><Provision /></RequiredAuth>} />
-          <Route path="/receive" element={<RequiredAuth><Receive /></RequiredAuth>} />
-          <Route path="/deploy" element={<RequiredAuth><Deploy /></RequiredAuth>} />
-          <Route path="/replace" element={<RequiredAuth><Replace /></RequiredAuth>} />
-          <Route path="/transfer" element={<RequiredAuth><Transfer /></RequiredAuth>} />
-          <Route path="/suspendreactivate" element={<RequiredAuth><SuspendReactivate /></RequiredAuth>} />
-          <Route path="/retire" element={<RequiredAuth><Retire /></RequiredAuth>} />
           <Route path="/styleguide" element={<RequiredAuth><StyleGuide /></RequiredAuth>} />
-          <Route path="/profile" element={<RequiredAuth><Profile /></RequiredAuth>} />
+          <Route path="/provision" element={<RequiredAuth><Provision /></RequiredAuth>} />
           <Route path="/address-translation" element={<AddressTranslation />} />
           <Route path="/asset-discovery" element={<AssetDiscovery />} />
           <Route path="/deep-packet-inspection" element={<DeepPacketInspection />} />

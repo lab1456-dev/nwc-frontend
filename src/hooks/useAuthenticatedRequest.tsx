@@ -3,9 +3,8 @@ import { jwtDecode } from 'jwt-decode';
 import { AuthContext } from '../contexts/AuthContext';
 import { 
   ApiResponse, 
-  makeApiRequest, 
   API_CONFIG
-} from '../services/apiService';
+} from '../services/api/apiService';
 
 /**
  * Interface for decoded JWT token

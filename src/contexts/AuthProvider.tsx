@@ -6,7 +6,11 @@ import {
   CognitoUserSession 
 } from 'amazon-cognito-identity-js';
 import { AuthContext } from './AuthContext';
-import { CognitoUserAttributes } from './AuthTypes';
+import { AuthChallengeResponse } from './AuthTypes';
+
+interface CognitoUserAttributes {
+  [key: string]: string;
+}
 
 export const cognitoConfig = {
   UserPoolId: `${import.meta.env.VITE_COGNITO_USER_POOL_ID}`,
@@ -22,7 +26,7 @@ interface AuthProviderProps {
   children: React.ReactNode;
 }
 
-// Global variable to store the Cognito user during MFA flow
+// Global variable to store the Cognito user during challenges
 let cognitoUser: CognitoUser | null = null;
 
 const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
@@ -30,7 +34,9 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<CognitoUserAttributes | null>(null);
   const [loading, setLoading] = useState(true);
   const [mfaPending, setMfaPending] = useState(false);
+  const [newPasswordRequired, setNewPasswordRequired] = useState(false);
 
+  console.log ({user})
   // Check if user is already authenticated on mount
   useEffect(() => {
     const currentUser = userPool.getCurrentUser();
@@ -79,26 +85,13 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
 
-  // Handle URL tokens (for redirect based auth flows)
-  useEffect(() => {
-    // Check if we have tokens in the URL (from a redirect)
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    const state = urlParams.get('state');
-    
-    if (code && state) {
-      console.log("Detected auth redirect with code");
-      // You might need to implement specific handling here if using auth code grant flow
-    }
-  }, []);
-
   // Sign in function
-  const signIn = (username: string, password: string, mfaCode?: string): Promise<CognitoUserSession> => {
+  const signIn = (username: string, password: string, mfaCode?: string): Promise<AuthChallengeResponse> => {
     return new Promise((resolve, reject) => {
       // If we have an existing MFA challenge and a code is provided
       if (mfaPending && mfaCode && cognitoUser) {
         cognitoUser.sendMFACode(mfaCode, {
-          onSuccess: (session) => {
+          onSuccess: (_session) => {
             setIsAuthenticated(true);
             setMfaPending(false);
             
@@ -119,10 +112,10 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               }
             });
             
-            resolve(session);
+            resolve({ success: true });
           },
           onFailure: (err) => {
-            reject(err);
+            reject({ success: false, message: err.message });
           }
         });
         return;
@@ -140,9 +133,10 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
 
       cognitoUser.authenticateUser(authenticationDetails, {
-        onSuccess: (session) => {
+        onSuccess: () => {
           setIsAuthenticated(true);
           setMfaPending(false);
+          setNewPasswordRequired(false);
           
           // Get user attributes
           cognitoUser!.getUserAttributes((err, attributes) => {
@@ -161,48 +155,96 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             }
           });
           
-          resolve(session);
+          resolve({ success: true });
         },
         onFailure: (err) => {
           console.error("Authentication failed:", err);
           setIsAuthenticated(false);
           setUser(null);
           setMfaPending(false);
+          setNewPasswordRequired(false);
           reject(err);
         },
         mfaRequired: (challengeName) => {
           console.log("MFA required:", challengeName);
           // Handle MFA challenge
           setMfaPending(true);
+          setNewPasswordRequired(false);
           
-          // Create a custom error to indicate MFA is required
-          const mfaError = new Error('MFA is required to complete authentication');
-          mfaError.name = 'MFARequiredError';
-          reject(mfaError);
+          resolve({ success: false, challengeName: 'MFARequired' });
         },
         totpRequired: (challengeName) => {
           console.log("TOTP required:", challengeName);
           // Handle TOTP (Time-based One-Time Password) challenge
           setMfaPending(true);
+          setNewPasswordRequired(false);
           
-          // Create a custom error to indicate TOTP is required
-          const totpError = new Error('TOTP code is required to complete authentication');
-          totpError.name = 'TOTPRequiredError';
-          reject(totpError);
+          resolve({ success: false, challengeName: 'TOTPRequired' });
         },
-        newPasswordRequired: (_userAttributes, _requiredAttributes) => {
+        newPasswordRequired: (userAttributes, requiredAttributes) => {
           console.log("New password required");
           // Handle new password required
-          const newPasswordError = new Error('New password required');
-          newPasswordError.name = 'NewPasswordRequiredError';
-          reject(newPasswordError);
+          setNewPasswordRequired(true);
+          setMfaPending(false);
+          
+          resolve({ 
+            success: false, 
+            challengeName: 'NewPasswordRequired',
+            userAttributes,
+            requiredAttributes
+          });
         },
         // Added for completeness, but rarely used in typical setups
         selectMFAType: (challengeName, _challengeParameters) => {
           console.log("Select MFA type:", challengeName);
-          const selectMfaError = new Error('Please select MFA type');
-          selectMfaError.name = 'SelectMFATypeError';
-          reject(selectMfaError);
+          resolve({ success: false, challengeName: 'SelectMFAType' });
+        }
+      });
+    });
+  };
+
+  // Complete new password challenge
+  const completeNewPasswordChallenge = (newPassword: string): Promise<AuthChallengeResponse> => {
+    return new Promise((resolve, reject) => {
+      if (!cognitoUser) {
+        reject({ success: false, message: "No authentication in progress" });
+        return;
+      }
+
+      cognitoUser.completeNewPasswordChallenge(newPassword, {}, {
+        onSuccess: () => {
+          setIsAuthenticated(true);
+          setNewPasswordRequired(false);
+          
+          // Get user attributes
+          cognitoUser!.getUserAttributes((err, attributes) => {
+            if (err) {
+              console.error("Error getting user attributes:", err);
+              return;
+            }
+            
+            if (attributes) {
+              const userAttributes = attributes.reduce((acc, attribute) => {
+                acc[attribute.getName()] = attribute.getValue();
+                return acc;
+              }, {} as CognitoUserAttributes);
+              
+              setUser(userAttributes);
+            }
+          });
+          
+          resolve({ success: true });
+        },
+        onFailure: (err) => {
+          console.error("Failed to complete new password challenge:", err);
+          reject({ success: false, message: err.message });
+        },
+        mfaRequired: (challengeName) => {
+          console.log("MFA required after password change:", challengeName);
+          setMfaPending(true);
+          setNewPasswordRequired(false);
+          
+          resolve({ success: false, challengeName: 'MFARequired' });
         }
       });
     });
@@ -216,6 +258,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsAuthenticated(false);
       setUser(null);
       setMfaPending(false);
+      setNewPasswordRequired(false);
     }
   };
   
@@ -237,7 +280,6 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
         
         // Return the JWT token from the session
-        // For API calls, you typically want the access token
         const token = session.getAccessToken().getJwtToken();
         resolve(token);
       });
@@ -252,6 +294,8 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       signOut, 
       loading,
       mfaRequired: mfaPending,
+      newPasswordRequired,
+      completeNewPasswordChallenge,
       getAuthToken
     }}>
       {children}

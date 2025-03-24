@@ -2,7 +2,7 @@ import React, { useContext, useState, useEffect } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import { AuthContext } from '../../contexts/AuthContext';
 import { useAuthenticatedRequest } from '../../hooks/useAuthenticatedRequest';
-import { API_CONFIG } from '../../services/apiService';
+import { API_CONFIG } from '../../services/api/apiService';
 import { 
   PageContainer, 
   PageHeader, 
